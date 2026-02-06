@@ -499,80 +499,110 @@
   </div>
 
   <script>
+<script>
   // ===== Firebase setup =====
 
-const firebaseConfig = {
-  apiKey: "AIzaSyBbza6v1KRxV8N0pmz080L9hzPvcUE8Mu4",
-  authDomain: "vvcarelog.firebaseapp.com",
-  projectId: "vvcarelog",
-  storageBucket: "vvcarelog.firebasestorage.app",
-  messagingSenderId: "333284118868",
-  appId: "1:333284118868:web:108c59c9f37f72dfbaf8c1"
-};
+  const firebaseConfig = {
+    apiKey: "AIzaSyBbza6v1KRxV8N0pmz080L9hzPvcUE8Mu4",
+    authDomain: "vvcarelog.firebaseapp.com",
+    projectId: "vvcarelog",
+    storageBucket: "vvcarelog.firebasestorage.app",
+    messagingSenderId: "333284118868",
+    appId: "1:333284118868:web:108c59c9f37f72dfbaf8c1"
+  };
 
-firebase.initializeApp(firebaseConfig);
+  firebase.initializeApp(firebaseConfig);
 
-const db = firebase.firestore();
-const auth = firebase.auth();
+  const db = firebase.firestore();
+  const auth = firebase.auth();
 
-let myUid = null;
-let isAdmin = false;
-let isAllowed = false;
+  let myUid = null;
+  let isAdmin = false;
+  let isAllowed = false;
 
-const metaRef = db.collection("carelog").doc("meta");
-const stateRef = db.collection("carelog").doc("state");
+  // 배지 갱신(디버깅용)
+  function updateUidBadge(){
+    const el = document.getElementById("uidBadge");
+    if(!el) return;
+    const uidTxt = myUid ? myUid : "(none)";
+    el.textContent = `UID: ${uidTxt} | admin:${isAdmin} | allowed:${isAllowed}`;
+  }
 
-auth.signInAnonymously();
+  const metaRef  = db.collection("carelog").doc("meta");
+  const stateRef = db.collection("carelog").doc("state");
 
-auth.onAuthStateChanged(async (user)=>{
+  // 익명 로그인
+  auth.signInAnonymously();
 
-  if(!user) return;
+  auth.onAuthStateChanged(async (user)=>{
+    if(!user) return;
 
-  myUid = user.uid;
+    myUid = user.uid;
+    console.log("내 UID:", myUid);
 
-  console.log("내 UID:", myUid);
+    // 로그인 직후 1차 표시(권한은 아직 모름)
+    updateUidBadge();
 
-  document.getElementById("uidBadge").textContent =
-  `UID: ${myUid} | admin:${isAdmin} | allowed:${isAllowed}`;
+    // ⚠️ 중요: meta 문서가 없을 때 "첫 접속자=관리자"로 자동 설정하면 안 됨.
+    // (남자친구가 먼저 접속하면 관리자 권한을 가져버림)
+    // meta 문서는 콘솔에서만 미리 만들어두는 방식으로 운영.
+    metaRef.onSnapshot(async (snap)=>{
+      if(!snap.exists){
+        updateUidBadge();
+        document.body.innerHTML =
+          `<div style="padding:40px;font-size:18px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;line-height:1.5">
+            <b>초기 설정 필요</b><br><br>
+            Firestore에 <code>carelog/meta</code> 문서를 먼저 만들어야 해요.<br>
+            (콘솔에서만 관리)<br><br>
+            지금 기기 UID:<br>
+            <b style="font-size:20px">${myUid}</b>
+          </div>`;
+        return;
+      }
 
+      const data = snap.data() || {};
+      isAdmin   = (data.adminUid === myUid);
+      isAllowed = Array.isArray(data.allowedUids) && data.allowedUids.includes(myUid);
+      updateUidBadge();
 
-  metaRef.onSnapshot(async (snap)=>{
+      // 허용 안된 사용자: 차단 + UID 안내
+      if(!isAdmin && !isAllowed){
+        document.body.innerHTML =
+          `<div style="padding:40px;font-size:18px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;line-height:1.5">
+            <b>접근 권한 없음</b><br><br>
+            이 UID를 관리자에게 보내서 허용 목록에 추가해달라고 하세요:<br>
+            <b style="font-size:20px">${myUid}</b>
+          </div>`;
+        return;
+      }
 
-    if(!snap.exists){
-      await metaRef.set({
-        adminUid: myUid,
-        allowedUids: []
-      });
-      return;
-    }
+      // 허용된 사용자만 실시간 state 구독 (중복 구독 방지)
+      if(!window.__CARELOG_STATE_SUBSCRIBED__){
+        window.__CARELOG_STATE_SUBSCRIBED__ = true;
 
-    const data = snap.data();
+        stateRef.onSnapshot((ss)=>{
+          const d = ss.data();
 
-    isAdmin = (data.adminUid === myUid);
-    isAllowed = (data.allowedUids || []).includes(myUid);
+          // state 문서가 아직 없다면:
+          // - 관리자는 초기 state를 한 번 올려서 시작
+          // - 유저는 관리자가 올릴 때까지 대기
+          if(!d || !d.blob){
+            if(isAdmin && !window.__CARELOG_STATE_BOOTSTRAPPED__){
+              window.__CARELOG_STATE_BOOTSTRAPPED__ = true;
+              // 현재 로컬 state를 초기값으로 업로드
+              stateRef.set({ blob: state });
+            }
+            return;
+          }
 
-    // 허용 안된 사용자
-    if(!isAdmin && !isAllowed){
-      document.body.innerHTML =
-        `<div style="padding:40px;font-size:18px">
-        접근 권한 없음.<br><br>
-        이 코드를 관리자에게 보내세요:<br>
-        <b>${myUid}</b>
-        </div>`;
-      return;
-    }
-
-    // 실시간 state 받기
-    stateRef.onSnapshot((ss)=>{
-      const d = ss.data();
-      if(!d) return;
-      state = d.blob;
-      build();
+          state = d.blob;
+          build();
+        });
+      }
     });
-
   });
 
-});
+  // ===== 이하 기존 코드 계속 =====
 
 
 
@@ -1323,5 +1353,6 @@ prevBtn.onclick=()=>{ if(!canNavigatePrev(cursor)) return; cursor=new Date(curso
   </script>
 </body>
 </html>
+
 
 
