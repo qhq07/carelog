@@ -501,6 +501,21 @@
 
  
 <script>
+
+  // 🔥 디버그: 에러를 화면에 표시
+window.addEventListener("error", (e) => {
+  const msg = e?.message || e?.error?.message || "Unknown error";
+  const b = document.getElementById("uidBadge");
+  if (b) b.textContent = "JS Error: " + msg;
+});
+window.addEventListener("unhandledrejection", (e) => {
+  const msg = e?.reason?.message || String(e?.reason) || "Unknown rejection";
+  const b = document.getElementById("uidBadge");
+  if (b) b.textContent = "Promise Error: " + msg;
+});
+
+// build 진입 확인
+console.log("script started");
   // ===== Firebase setup =====
 
   const firebaseConfig = {
@@ -1370,6 +1385,7 @@ prevBtn.onclick=()=>{ if(!canNavigatePrev(cursor)) return; cursor=new Date(curso
   </script>
 </body>
 </html>
+
 
 
 
