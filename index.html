@@ -350,6 +350,66 @@
   z-index: 100;
 }
 
+    /* Day 상세 note item 개선 */
+.noteItem{
+  align-items:flex-start;            /* 위쪽 정렬 */
+}
+
+.noteTitleRow{
+  align-items:flex-start;            /* 아이콘/타이틀을 위로 */
+  flex-wrap:nowrap;                  /* 머리행 줄바꿈 금지 */
+  width:100%;
+}
+
+/* 아이콘 + 타이틀 영역 너비 고정(왼쪽 상단 고정 느낌) */
+.noteHead{
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+  width:130px;                       /* ✅ 머리행 너비 고정(원하면 숫자만 조절) */
+  min-width:130px;
+  flex:0 0 130px;
+}
+
+.noteIcon{
+  width:22px;
+  min-width:22px;
+  text-align:center;
+  line-height:1.2;
+}
+
+.noteTitle{
+  font-weight:800;
+  line-height:1.2;
+}
+
+/* 메모(본문)는 더 작고 연하게, 줄바꿈 허용 + 잘림 방지 */
+.noteBody{
+  flex:1;
+  min-width:0;
+  font-size:12px;                    /* ✅ 더 작게 */
+  color: rgba(17,17,17,.60);         /* ✅ 더 연하게 */
+  line-height:1.35;
+  white-space:normal;                /* ✅ 줄바꿈 */
+  word-break:break-word;             /* ✅ 긴 글도 안 잘리게 */
+  overflow:visible;                  /* ✅ 잘림 방지 */
+}
+
+/* 구분자 | 는 메모 있을 때만 보이게 */
+.noteSep{
+  margin:0 8px;
+  color: rgba(17,17,17,.35);
+  font-weight:700;
+}
+
+/* Day 상세 모달 높이/본문 높이 상향 */
+.modal.smallModal{
+  max-height: 680px;                 /* ✅ 모달 전체 높이 증가 */
+}
+.modal.smallModal .modal-body{
+  max-height: calc(680px - 58px);    /* 헤더 제외 */
+}
+    
 /* 비고 추가 창 (항상 위) */
 #noteBackdrop {
   z-index: 200;
@@ -1353,18 +1413,28 @@ function normalizeState(s){
         dayNoteList.innerHTML = `<div class="small" style="padding:6px 2px;">(비고 없음)</div>`;
       }else{
         dayNoteList.innerHTML = notes.map((n, idx)=>{
-          const title = noteTitleFor(entity.type, n.icon||"");
-          const icon = n.icon||"";
-          const memo = n.detail||"";
-          return `<div class="noteItem" data-idx="${idx}">
-                    <div class="noteTitleRow">
-                      <span>${escapeHtml(icon)}</span>
-                      <span>${escapeHtml(title||"")}</span>
-                      <span style="color:var(--muted);font-weight:700;">|</span>
-                      <span class="meta">${escapeHtml(memo||"")}</span>
-                    </div>
-                  </div>`;
-        }).join("");
+  const title = noteTitleFor(entity.type, n.icon||"");
+  const icon  = n.icon||"";
+  const memo  = (n.detail||"").trim();
+
+  // 메모가 없으면 구분자(|)와 메모 영역 자체를 안 그림
+  const sepHtml  = memo ? `<span class="noteSep">|</span>` : "";
+  const bodyHtml = memo ? `<div class="noteBody">${escapeHtml(memo)}</div>` : "";
+
+  return `
+    <div class="noteItem" data-idx="${idx}">
+      <div class="noteTitleRow">
+        <div class="noteHead">
+          <div class="noteIcon">${escapeHtml(icon)}</div>
+          <div class="noteTitle">${escapeHtml(title||"")}</div>
+        </div>
+        ${sepHtml}
+        ${bodyHtml}
+      </div>
+    </div>
+  `;
+}).join("");
+
       }
 
       dayNoteList.querySelectorAll(".noteItem").forEach(el=>{
@@ -1416,6 +1486,7 @@ prevBtn.onclick=()=>{ if(!canNavigatePrev(cursor)) return; cursor=new Date(curso
   </script>
 </body>
 </html>
+
 
 
 
