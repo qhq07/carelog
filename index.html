@@ -360,8 +360,11 @@
 </head>
 <body>
   <div id="uidBadge" style="position:fixed;right:10px;bottom:10px;background:#111;color:#fff;padding:6px 10px;border-radius:10px;font-size:12px;z-index:9999;opacity:.85"></div>
-
-  <div class="wrap">
+  <div id="gate" style="padding:40px;font-size:18px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;line-height:1.5">
+  접근 확인 중...
+  </div>
+</body>
+  <div class="wrap" id="appRoot" style="display:none;">
     <div class="topbar">
       <div class="title"> 📝 Care Log </div>
       <div class="monthnav">
@@ -498,7 +501,7 @@
     </div>
   </div>
 
-  <script>
+ 
 <script>
   // ===== Firebase setup =====
 
@@ -520,6 +523,30 @@
   let isAdmin = false;
   let isAllowed = false;
 
+  const appRoot = document.getElementById("appRoot");
+const gate = document.getElementById("gate");
+
+if(!isAdmin && !isAllowed){
+  appRoot.style.display = "none";
+  gate.style.display = "block";
+  gate.innerHTML = `
+    <b>접근 권한 없음</b><br><br>
+    이 UID를 관리자에게 보내서 허용 목록에 추가해달라고 하세요:<br>
+    <b style="font-size:20px">${myUid}</b>
+  `;
+  return;
+}
+
+// ✅ 허용됨: 이제부터 화면 열기 + 최초 1회 build
+gate.style.display = "none";
+appRoot.style.display = "block";
+
+if(!window.__CARELOG_BUILT__){
+  window.__CARELOG_BUILT__ = true;
+  build();
+}
+
+  
   // 배지 갱신(디버깅용)
   function updateUidBadge(){
     const el = document.getElementById("uidBadge");
@@ -549,14 +576,6 @@
     metaRef.onSnapshot(async (snap)=>{
       if(!snap.exists){
         updateUidBadge();
-        document.body.innerHTML =
-          `<div style="padding:40px;font-size:18px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;line-height:1.5">
-            <b>초기 설정 필요</b><br><br>
-            Firestore에 <code>carelog/meta</code> 문서를 먼저 만들어야 해요.<br>
-            (콘솔에서만 관리)<br><br>
-            지금 기기 UID:<br>
-            <b style="font-size:20px">${myUid}</b>
-          </div>`;
         return;
       }
 
@@ -1349,10 +1368,10 @@ prevBtn.onclick=()=>{ if(!canNavigatePrev(cursor)) return; cursor=new Date(curso
       if(cursor>max) cursor=new Date(max);
     })();
 
-    build();
   </script>
 </body>
 </html>
+
 
 
 
