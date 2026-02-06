@@ -416,6 +416,32 @@
   z-index: 200;
 }
 
+    /* Toast */
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  background: rgba(17,17,17,.92);
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 12px;
+  z-index: 99999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s ease, transform .18s ease;
+  max-width: min(520px, 92vw);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(-4px);
+}
+
+
   </style>
 </head>
 <body>
@@ -823,6 +849,22 @@ function normalizeState(s){
   return div.innerHTML;
 }
 
+    let __toastTimer = null;
+
+function toast(msg, ms=1200){
+  const el = document.getElementById("toast");
+  if(!el) return;
+  el.textContent = msg;
+
+  el.classList.add("show");
+  if(__toastTimer) clearTimeout(__toastTimer);
+
+  __toastTimer = setTimeout(()=>{
+    el.classList.remove("show");
+  }, ms);
+}
+
+
 
     function getCheck(rowKey, dateStr){ return state.checks?.[rowKey]?.[dateStr] || null; }
     function setCheck(rowKey, dateStr, val){
@@ -831,6 +873,7 @@ function normalizeState(s){
       if(val===null) delete state.checks[rowKey][dateStr];
       else state.checks[rowKey][dateStr] = { v:val, at: nowDay() };
       saveState();
+      toast("기록 반영됨 ✓");
     }
     function getNotes(rowKey, dateStr){
       const arr = state.notes?.[rowKey]?.[dateStr];
@@ -1074,20 +1117,27 @@ function normalizeState(s){
         if(noteCtx.idx!==null && noteCtx.idx!==undefined) updateNote(noteCtx.rowKey,noteCtx.dateStr,noteCtx.idx,{icon,detail});
         else addNote(noteCtx.rowKey,noteCtx.dateStr,{icon,detail});
       }
+      toast("저장됨 ✅");
       closeNoteModal();
       build();
       if(dayCtx) openDayDetail(dayCtx.entityId, dayCtx.dateStr, true);
     };
-    document.getElementById("noteDelete").onclick=()=>{
-      if(!noteCtx) return;
-      if(!allowEditOrConfirm(noteCtx.dateStr)) return;
-      if(noteCtx.idx===null || noteCtx.idx===undefined){ closeNoteModal(); return; }
-      if(!confirm("삭제하시겠습니까?")) return;
-      deleteNoteAt(noteCtx.rowKey,noteCtx.dateStr,noteCtx.idx);
-      closeNoteModal();ㄹ
-      build();
-      if(dayCtx) openDayDetail(dayCtx.entityId, dayCtx.dateStr, true);
-    };
+    document.getElementById("noteDelete").onclick = () => {
+  if(!noteCtx) return;
+  if(noteCtx.idx === null || noteCtx.idx === undefined) return;
+
+  // 과거 날짜면 여기서도 한 번 더 확인(원하면 제거 가능)
+  if(!allowEditOrConfirm(noteCtx.dateStr)) return;
+
+  if(!confirm("삭제하시겠습니까?")) return;
+
+  deleteNoteAt(noteCtx.rowKey, noteCtx.dateStr, noteCtx.idx);
+  toast("삭제됨 🗑️");
+  closeNoteModal();
+  build();
+  if(dayCtx) openDayDetail(dayCtx.entityId, dayCtx.dateStr, true);
+};
+
     
     const weightBackdrop=document.getElementById("weightBackdrop");
     const weightTitle=document.getElementById("weightTitle");
@@ -1127,6 +1177,7 @@ function normalizeState(s){
       const val=Number.isFinite(num)?num:v;
 
       upsertWeight(weightEntityId,d,val,unit);
+      toast("체중 저장됨 ⚖️");
       renderWeightModal(weightEntityId);
       build();
     };
@@ -1333,7 +1384,15 @@ function normalizeState(s){
       html += "</tbody>";
       historyTable.innerHTML = html;
 
-      historyTable.querySelectorAll("td.iconCell","td.blank").forEach(td=>{
+      historyTable.querySelectorAll("td.iconCell").forEach(td=>{
+        td.addEventListener("click", ()=>{
+          const dateStr=td.getAttribute("data-date");
+          const eid=td.getAttribute("data-entity");
+          if(dateStr && eid) openDayDetail(eid,dateStr);
+        });
+      });
+
+      historyTable.querySelectorAll("td.blank").forEach(td=>{
         td.addEventListener("click", ()=>{
           const dateStr=td.getAttribute("data-date");
           const eid=td.getAttribute("data-entity");
@@ -1485,8 +1544,10 @@ prevBtn.onclick=()=>{ if(!canNavigatePrev(cursor)) return; cursor=new Date(curso
     })();
 
   </script>
+  <div id="toast"></div>
 </body>
 </html>
+
 
 
 
