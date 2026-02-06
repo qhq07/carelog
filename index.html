@@ -645,9 +645,9 @@ auth.onAuthStateChanged((user) => {
         return;
       }
 
-      state = d.blob;
-      // build는 아래쪽에 정의되어 있어도 호출 가능(호이스팅)
-      build();
+state = normalizeState(d.blob);
+build();
+
     });
   }, (err) => {
     console.error("meta snapshot error:", err);
@@ -729,7 +729,16 @@ function requireAdmin(){
   });
 }
 }
-    let state = loadState();
+
+function normalizeState(s){
+  s = (s && typeof s === "object") ? s : {};
+  if(!s.checks || typeof s.checks !== "object") s.checks = {};
+  if(!s.notes  || typeof s.notes  !== "object") s.notes  = {};
+  if(!s.weights|| typeof s.weights!== "object") s.weights= {};
+  return s;
+}
+    let state = normalizeState(loadState());
+
 
     const pad2 = n => String(n).padStart(2,"0");
     function ymd(d){ return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; }
@@ -1014,7 +1023,7 @@ function requireAdmin(){
       if(noteCtx.idx===null || noteCtx.idx===undefined){ closeNoteModal(); return; }
       if(!confirm("삭제하시겠습니까?")) return;
       deleteNoteAt(noteCtx.rowKey,noteCtx.dateStr,noteCtx.idx);
-      closeNoteModal();
+      closeNoteModal();ㄹ
       build();
       if(dayCtx) openDayDetail(dayCtx.entityId, dayCtx.dateStr, true);
     };
@@ -1406,6 +1415,7 @@ prevBtn.onclick=()=>{ if(!canNavigatePrev(cursor)) return; cursor=new Date(curso
   </script>
 </body>
 </html>
+
 
 
 
