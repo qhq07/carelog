@@ -19,6 +19,9 @@ HTML = r"""<!doctype html>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title> 📝 Care Log </title>
+  <script src="https://www.gstatic.com/firebasejs/9.10.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.10.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.10.0/firebase-firestore-compat.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
     :root{
@@ -509,6 +512,79 @@ HTML = r"""<!doctype html>
   </div>
 
   <script>
+  // ===== Firebase setup =====
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBbza6v1KRxV8N0pmz080L9hzPvcUE8Mu4",
+  authDomain: "vvcarelog.firebaseapp.com",
+  projectId: "vvcarelog",
+  storageBucket: "vvcarelog.firebasestorage.app",
+  messagingSenderId: "333284118868",
+  appId: "1:333284118868:web:108c59c9f37f72dfbaf8c1"
+};
+
+firebase.initializeApp(firebaseConfig);
+
+const db = firebase.firestore();
+const auth = firebase.auth();
+
+let myUid = null;
+let isAdmin = false;
+let isAllowed = false;
+
+const metaRef = db.collection("carelog").doc("meta");
+const stateRef = db.collection("carelog").doc("state");
+
+auth.signInAnonymously();
+
+auth.onAuthStateChanged(async (user)=>{
+
+  if(!user) return;
+
+  myUid = user.uid;
+
+  console.log("내 UID:", myUid);
+
+  metaRef.onSnapshot(async (snap)=>{
+
+    if(!snap.exists){
+      await metaRef.set({
+        adminUid: myUid,
+        allowedUids: []
+      });
+      return;
+    }
+
+    const data = snap.data();
+
+    isAdmin = (data.adminUid === myUid);
+    isAllowed = (data.allowedUids || []).includes(myUid);
+
+    // 허용 안된 사용자
+    if(!isAdmin && !isAllowed){
+      document.body.innerHTML =
+        `<div style="padding:40px;font-size:18px">
+        접근 권한 없음.<br><br>
+        이 코드를 관리자에게 보내세요:<br>
+        <b>${myUid}</b>
+        </div>`;
+      return;
+    }
+
+    // 실시간 state 받기
+    stateRef.onSnapshot((ss)=>{
+      const d = ss.data();
+      if(!d) return;
+      state = d.blob;
+      build();
+    });
+
+  });
+
+});
+
+
+
     const APP_KEY = "carelog_v5_final";
     const START_YM = { y: 2025, m: 12 };
 
@@ -560,7 +636,13 @@ HTML = r"""<!doctype html>
         return st;
       }catch(e){ return { checks:{}, notes:{}, weights:{} }; }
     }
-    function saveState(){ localStorage.setItem(APP_KEY, JSON.stringify(state)); }
+    function saveState(){ localStorage.setItem(APP_KEY, JSON.stringify(state));
+    if(isAdmin){
+  stateRef.set({
+    blob: state
+  });
+}
+}
     let state = loadState();
 
     const pad2 = n => String(n).padStart(2,"0");
