@@ -1286,7 +1286,9 @@ function toast(msg, ms=1200){
             x:{ type:"linear", min:0, max:(monthKeys.length-1)+0.999, ticks:{ autoSkip:false, maxRotation:0, callback:(v)=>{ const i=Math.round(v); if(Math.abs(v-i)<0.001 && monthLabels[i]) return monthLabels[i]; return ""; } } },
             y:{
               min:0,
-              max:7
+              max:
+              {if (${entity.type}==="cat") return 6 ;
+               if (${entity.type}==="reptile") return 60 ;}
             }
           }
         }
@@ -1547,6 +1549,7 @@ prevBtn.onclick=()=>{ if(!canNavigatePrev(cursor)) return; cursor=new Date(curso
   <div id="toast"></div>
 </body>
 </html>
+
 
 
 
