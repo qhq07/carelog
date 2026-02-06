@@ -1332,7 +1332,7 @@ function normalizeState(s){
       dayNextBtn.disabled = next > max;
 
       // meds
-      let medsHtml = "<div style='font-weight:800; margin-bottom:6px;'>약 복용 상태</div>";
+      let medsHtml = "<div style='font-weight:800; margin-bottom:6px;'></div>";
       if(entityId==="me"){
         const chk=getCheck("me_med",dateStr);
         medsHtml += `<div>💊 ${chk ? "✓" : "미복용"}</div>`;
@@ -1341,7 +1341,7 @@ function normalizeState(s){
         medsHtml += `<div>저녁 약: ${getCheck("gc_pm",dateStr)?"✓":"—"}</div>`;
         medsHtml += `<div>영양제: ${getCheck("gc_supp",dateStr)?"✓":"—"}</div>`;
       }else{
-        medsHtml += `<div class="small">(해당 없음)</div>`;
+        medsHtml += `<div class="small">-</div>`;
       }
       dayMeds.innerHTML = medsHtml;
 
@@ -1415,6 +1415,7 @@ prevBtn.onclick=()=>{ if(!canNavigatePrev(cursor)) return; cursor=new Date(curso
   </script>
 </body>
 </html>
+
 
 
 
