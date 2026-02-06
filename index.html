@@ -359,6 +359,8 @@
   </style>
 </head>
 <body>
+  <div id="uidBadge" style="position:fixed;right:10px;bottom:10px;background:#111;color:#fff;padding:6px 10px;border-radius:10px;font-size:12px;z-index:9999;opacity:.85"></div>
+
   <div class="wrap">
     <div class="topbar">
       <div class="title"> 📝 Care Log </div>
@@ -529,6 +531,10 @@ auth.onAuthStateChanged(async (user)=>{
   myUid = user.uid;
 
   console.log("내 UID:", myUid);
+
+  document.getElementById("uidBadge").textContent =
+  `UID: ${myUid} | admin:${isAdmin} | allowed:${isAllowed}`;
+
 
   metaRef.onSnapshot(async (snap)=>{
 
@@ -1299,3 +1305,4 @@ prevBtn.onclick=()=>{ if(!canNavigatePrev(cursor)) return; cursor=new Date(curso
   </script>
 </body>
 </html>
+
