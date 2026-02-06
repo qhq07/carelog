@@ -1224,15 +1224,16 @@ function normalizeState(s){
 
       if(entityId==="me"){
         const chk=getCheck("me_med",dateStr);
-        if(!chk) return { icon:"❌", disabled:false, dateStr, tip:"약 미복용" };
+        if(!chk) return { icon:"❌", disabled:false, dateStr, tip:"미복용" };
         return { icon:"", disabled:false, dateStr:null, tip:"" };
       }
 
       if(entityId==="gangcheol"){
         const am=!!getCheck("gc_am",dateStr);
+        const pm=!!getCheck("gc_pm",dateStr);
         const missed=!(am && pm);
-        if(missed && noteIcon) return { icon:"✳️", disabled:false, dateStr, tip:["약 미복용", noteTip].filter(Boolean).join("\n") };
-        if(missed) return { icon:"❌", disabled:false, dateStr, tip:"약 미복용" };
+        if(missed && noteIcon) return { icon:"✳️", disabled:false, dateStr, tip:["미복용", noteTip].filter(Boolean).join("\n") };
+        if(missed) return { icon:"❌", disabled:false, dateStr, tip:"미복용" };
         if(noteIcon) return { icon:noteIcon, disabled:false, dateStr, tip: noteTip };
         return { icon:"", disabled:false, dateStr:null, tip:"" };
       }
@@ -1415,6 +1416,7 @@ prevBtn.onclick=()=>{ if(!canNavigatePrev(cursor)) return; cursor=new Date(curso
   </script>
 </body>
 </html>
+
 
 
 
