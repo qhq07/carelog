@@ -1333,7 +1333,7 @@ function normalizeState(s){
       html += "</tbody>";
       historyTable.innerHTML = html;
 
-      historyTable.querySelectorAll("td.cell").forEach(td=>{
+      historyTable.querySelectorAll("td.iconCell","td.blank").forEach(td=>{
         td.addEventListener("click", ()=>{
           const dateStr=td.getAttribute("data-date");
           const eid=td.getAttribute("data-entity");
@@ -1487,6 +1487,7 @@ prevBtn.onclick=()=>{ if(!canNavigatePrev(cursor)) return; cursor=new Date(curso
   </script>
 </body>
 </html>
+
 
 
 
