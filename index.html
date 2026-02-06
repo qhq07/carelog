@@ -1260,6 +1260,12 @@ function toast(msg, ms=1200){
       canvas.width = Math.max(900, monthsCount * pxPerMonth);
       canvas.height = 260;
 
+      const entity = ENTITIES.find(e => e.id === entityId);
+
+let yMax = 10; // 기본값
+if (entity.type === "cat") yMax = 7;
+if (entity.type === "reptile") yMax = 60;
+
       const ctx = canvas.getContext("2d");
       if(chart) chart.destroy();
 
@@ -1286,9 +1292,7 @@ function toast(msg, ms=1200){
             x:{ type:"linear", min:0, max:(monthKeys.length-1)+0.999, ticks:{ autoSkip:false, maxRotation:0, callback:(v)=>{ const i=Math.round(v); if(Math.abs(v-i)<0.001 && monthLabels[i]) return monthLabels[i]; return ""; } } },
             y:{
               min:0,
-              max:
-              {if (${entity.type}==="cat") return 6 ;
-               if (${entity.type}==="reptile") return 60 ;}
+              max:yMax
             }
           }
         }
@@ -1333,13 +1337,13 @@ function toast(msg, ms=1200){
       const noteTip = notes.length ? notes.map(n=>`${n.icon||""} ${n.detail||""}`.trim()).join("\n") : "";
 
       if(isPastNoteOnlyMonth(y,m1)){
-        return { icon: noteIcon, disabled:false, dateStr: (noteIcon?dateStr:null), tip: noteTip };
+        return { icon: noteIcon, disabled:false, dateStr, tip: noteTip };
       }
 
       if(entityId==="me"){
         const chk=getCheck("me_med",dateStr);
         if(!chk) return { icon:"❌", disabled:false, dateStr, tip:"미복용" };
-        return { icon:"", disabled:false, dateStr:null, tip:"" };
+        return { icon:"", disabled:false, dateStr, tip:"" };
       }
 
       if(entityId==="gangcheol"){
@@ -1349,11 +1353,11 @@ function toast(msg, ms=1200){
         if(missed && noteIcon) return { icon:"✳️", disabled:false, dateStr, tip:["미복용", noteTip].filter(Boolean).join("\n") };
         if(missed) return { icon:"❌", disabled:false, dateStr, tip:"미복용" };
         if(noteIcon) return { icon:noteIcon, disabled:false, dateStr, tip: noteTip };
-        return { icon:"", disabled:false, dateStr:null, tip:"" };
+        return { icon:"", disabled:false, dateStr, tip:"" };
       }
 
       if(noteIcon) return { icon:noteIcon, disabled:false, dateStr, tip: noteTip };
-      return { icon:"", disabled:false, dateStr:null, tip:"" };
+      return { icon:"", disabled:false, dateStr, tip:"" };
     }
 
     function openHistoryModal(entityId){
@@ -1549,6 +1553,7 @@ prevBtn.onclick=()=>{ if(!canNavigatePrev(cursor)) return; cursor=new Date(curso
   <div id="toast"></div>
 </body>
 </html>
+
 
 
 
