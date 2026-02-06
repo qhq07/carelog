@@ -500,40 +500,12 @@
   </div>
 
  
-<script>
 
-
-
+  <script>
 // build 진입 확인
 console.log("script started");
-  // ===== Firebase setup =====
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyBbza6v1KRxV8N0pmz080L9hzPvcUE8Mu4",
-    authDomain: "vvcarelog.firebaseapp.com",
-    projectId: "vvcarelog",
-    storageBucket: "vvcarelog.firebasestorage.app",
-    messagingSenderId: "333284118868",
-    appId: "1:333284118868:web:108c59c9f37f72dfbaf8c1"
-  };
-
-  firebase.initializeApp(firebaseConfig);
-
-  console.log("firebase global:", typeof firebase);
-console.log("apps:", firebase.apps?.length, firebase.apps);
-  
-  const auth = firebase.auth();
-  const db = firebase.firestore();
- 
-
-  let myUid = null;
-  let isAdmin = false;
-  let isAllowed = false;
-
-  const appRoot = document.getElementById("appRoot");
-const gate = document.getElementById("gate");
-
-  // 🔥 디버그: 에러를 화면에 표시
+// 🔥 디버그: 에러를 화면에 표시
 window.addEventListener("error", (e) => {
   const msg = e?.message || e?.error?.message || "Unknown error";
   const b = document.getElementById("uidBadge");
@@ -544,100 +516,145 @@ window.addEventListener("unhandledrejection", (e) => {
   const b = document.getElementById("uidBadge");
   if (b) b.textContent = "Promise Error: " + msg;
 });
-  
 
-if(!window.__CARELOG_BUILT__){
-  window.__CARELOG_BUILT__ = true;
+// ===== Firebase setup =====
+const firebaseConfig = {
+  apiKey: "AIzaSyBbza6v1KRxV8N0pmz080L9hzPvcUE8Mu4",
+  authDomain: "vvcarelog.firebaseapp.com",
+  projectId: "vvcarelog",
+  storageBucket: "vvcarelog.firebasestorage.app",
+  messagingSenderId: "333284118868",
+  appId: "1:333284118868:web:108c59c9f37f72dfbaf8c1"
+};
+
+firebase.initializeApp(firebaseConfig);
+console.log("firebase global:", typeof firebase);
+console.log("apps:", firebase.apps?.length, firebase.apps);
+
+const auth = firebase.auth();
+const db   = firebase.firestore();
+
+let myUid = null;
+let isAdmin = false;
+let isAllowed = false;
+
+const metaRef  = db.collection("carelog").doc("meta");
+const stateRef = db.collection("carelog").doc("state");
+
+// ⚠️ HTML에 이 두 div가 반드시 있어야 함:
+// <div id="gate">...</div>
+// <div id="appRoot">...</div>
+const gate = document.getElementById("gate");
+const appRoot = document.getElementById("appRoot");
+
+// 기본 상태: gate 보이고 앱 숨김
+if (gate) {
+  gate.style.display = "block";
+  gate.innerHTML = "접근 확인중...";
+}
+if (appRoot) appRoot.style.display = "none";
+
+// 배지 갱신(디버깅용)
+function updateUidBadge(){
+  const el = document.getElementById("uidBadge");
+  if(!el) return;
+  const uidTxt = myUid ? myUid : "(none)";
+  el.textContent = `UID: ${uidTxt} | admin:${isAdmin} | allowed:${isAllowed}`;
 }
 
-  
-  // 배지 갱신(디버깅용)
-  function updateUidBadge(){
-    const el = document.getElementById("uidBadge");
-    if(!el) return;
-    const uidTxt = myUid ? myUid : "(none)";
-    el.textContent = `UID: ${uidTxt} | admin:${isAdmin} | allowed:${isAllowed}`;
+// gate에 메시지 보여주는 헬퍼
+function showGate(html){
+  if (!gate) return;
+  gate.style.display = "block";
+  gate.innerHTML = html;
+  if (appRoot) appRoot.style.display = "none";
+}
+
+// 앱 열기
+function openApp(){
+  if (gate) gate.style.display = "none";
+  if (appRoot) appRoot.style.display = "block";
+}
+
+// 익명 로그인 (중복 호출 안전 처리)
+auth.signInAnonymously().catch((e) => {
+  console.error("signInAnonymously error:", e);
+  showGate(`<b>로그인 실패</b><br><br>${e.code || ""}<br>${e.message || e}`);
+});
+
+// auth 상태
+auth.onAuthStateChanged((user) => {
+  if (!user) return;
+
+  myUid = user.uid;
+  console.log("내 UID:", myUid);
+  updateUidBadge();
+
+  // meta 구독 (중복 구독 방지)
+  if (window.__CARELOG_META_UNSUB__) {
+    // 이미 구독중이면 더 안함
+    return;
   }
 
-  const metaRef  = db.collection("carelog").doc("meta");
-  const stateRef = db.collection("carelog").doc("state");
-
-  // 익명 로그인
-  auth.signInAnonymously();
-
-  auth.onAuthStateChanged(async (user)=>{
-    if(!user) return;
-
-    myUid = user.uid;
-    console.log("내 UID:", myUid);
-
-    // 로그인 직후 1차 표시(권한은 아직 모름)
-    updateUidBadge();
-
-    // ⚠️ 중요: meta 문서가 없을 때 "첫 접속자=관리자"로 자동 설정하면 안 됨.
-    // (남자친구가 먼저 접속하면 관리자 권한을 가져버림)
-    // meta 문서는 콘솔에서만 미리 만들어두는 방식으로 운영.
-    metaRef.onSnapshot(async (snap)=>{
-
-      if(!snap.exists){
-        updateUidBadge();
-        return;
-      }
-
-      const data = snap.data() || {};
-      isAdmin   = (data.adminUid === myUid);
-      isAllowed = Array.isArray(data.allowedUids) && data.allowedUids.includes(myUid);
+  window.__CARELOG_META_UNSUB__ = metaRef.onSnapshot((snap) => {
+    // 1) meta 없으면: 초기 설정 필요 (콘솔에서 meta 만들어야 함)
+    if (!snap.exists) {
+      isAdmin = false;
+      isAllowed = false;
       updateUidBadge();
 
-      // 계산 끝났으니 이제 UI 결정
-if(!isAdmin && !isAllowed){
-  appRoot.style.display = "none";
-  gate.style.display = "block";
-  gate.innerHTML = `... ${myUid} ...`;
-  return;
-}
+      showGate(`
+        <b>초기 설정 필요</b><br><br>
+        Firestore에 <code>carelog/meta</code> 문서를 먼저 만들어야 합니다.<br>
+        그리고 아래 UID를 <code>adminUid</code> 및 <code>allowedUids</code>에 넣어주세요:<br><br>
+        <b style="font-size:18px">${myUid}</b>
+      `);
+      return;
+    }
 
-// 허용됨
-gate.style.display = "none";
-appRoot.style.display = "block";
+    // 2) meta 있으면 권한 계산
+    const data = snap.data() || {};
+    isAdmin = (data.adminUid === myUid);
+    isAllowed = Array.isArray(data.allowedUids) && data.allowedUids.includes(myUid);
+    updateUidBadge();
 
+    // 3) 허용 안 된 사용자: gate에 UID 띄우고 종료
+    if (!isAdmin && !isAllowed) {
+      showGate(`
+        <b>접근 권한 없음</b><br><br>
+        이 UID를 관리자에게 보내서 허용 목록(allowedUids)에 추가해달라고 하세요:<br><br>
+        <b style="font-size:18px">${myUid}</b>
+      `);
+      return;
+    }
 
-      // 허용 안된 사용자: 차단 + UID 안내
-      if(!isAdmin && !isAllowed){
-        document.body.innerHTML =
-          `<div style="padding:40px;font-size:18px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;line-height:1.5">
-            <b>접근 권한 없음</b><br><br>
-            이 UID를 관리자에게 보내서 허용 목록에 추가해달라고 하세요:<br>
-            <b style="font-size:20px">${myUid}</b>
-          </div>`;
+    // 4) 허용됨: 앱 열기 + state 구독 1회만
+    openApp();
+
+    if (window.__CARELOG_STATE_UNSUB__) return;
+    window.__CARELOG_STATE_UNSUB__ = stateRef.onSnapshot((ss) => {
+      const d = ss.data();
+
+      // state 문서가 없거나 blob가 없을 때
+      if (!d || !d.blob) {
+        // 관리자는 최초 1회 업로드로 부팅
+        if (isAdmin && !window.__CARELOG_STATE_BOOTSTRAPPED__) {
+          window.__CARELOG_STATE_BOOTSTRAPPED__ = true;
+          stateRef.set({ blob: state }).catch(console.error);
+        }
         return;
       }
 
-      // 허용된 사용자만 실시간 state 구독 (중복 구독 방지)
-      if(!window.__CARELOG_STATE_SUBSCRIBED__){
-        window.__CARELOG_STATE_SUBSCRIBED__ = true;
-
-        stateRef.onSnapshot((ss)=>{
-          const d = ss.data();
-
-          // state 문서가 아직 없다면:
-          // - 관리자는 초기 state를 한 번 올려서 시작
-          // - 유저는 관리자가 올릴 때까지 대기
-          if(!d || !d.blob){
-            if(isAdmin && !window.__CARELOG_STATE_BOOTSTRAPPED__){
-              window.__CARELOG_STATE_BOOTSTRAPPED__ = true;
-              // 현재 로컬 state를 초기값으로 업로드
-              stateRef.set({ blob: state });
-            }
-            return;
-          }
-
-          state = d.blob;
-          build();
-        });
-      }
+      state = d.blob;
+      // build는 아래쪽에 정의되어 있어도 호출 가능(호이스팅)
+      build();
     });
+  }, (err) => {
+    console.error("meta snapshot error:", err);
+    showGate(`<b>권한/DB 오류</b><br><br>${err.code || ""}<br>${err.message || err}`);
   });
+});
+
 
   // ===== 이하 기존 코드 계속 =====
 
@@ -1389,6 +1406,7 @@ prevBtn.onclick=()=>{ if(!canNavigatePrev(cursor)) return; cursor=new Date(curso
   </script>
 </body>
 </html>
+
 
 
 
