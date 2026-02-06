@@ -1,0 +1,1245 @@
+"""
+Care Log (Monthly) — final generator + launcher
+
+- Creates "carelog.html" next to this .py file.
+- Opens it in your default browser.
+- Data is stored in your browser (LocalStorage) on this PC.
+
+Run (Windows):
+  py carelog_app_final.py
+"""
+
+from __future__ import annotations
+import os
+import webbrowser
+
+HTML = r"""<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title> 📝 Care Log </title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root{
+      --bg:#f7f7f5;
+      --panel:#ffffff;
+      --text:#111111;
+      --muted:rgba(17,17,17,.55);
+      --line:rgba(17,17,17,.10);
+      --line2:rgba(17,17,17,.06);
+      --hover:rgba(17,17,17,.04);
+      --today:rgba(46,170,220,.12);
+    }
+    body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;}
+    .wrap{max-width:1200px;margin:22px auto;padding:0 16px;}
+    .topbar{
+      display:flex;align-items:center;justify-content:space-between;flex-wrap:nowrap;
+      gap:12px;margin-bottom:14px;
+      background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px 14px;
+      box-shadow:0 6px 18px rgba(0,0,0,.06);
+    }
+    .title{font-size:18px;font-weight:700;opacity:.95;white-space:nowrap}
+    .monthnav{display:flex;align-items:center;gap:8px;white-space:nowrap;margin-left:auto;}
+    button{
+      border:none; outline:none;
+      background: rgba(17,17,17,.06);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 12px;
+      cursor:pointer;
+    }
+    button:hover{background: rgba(17,17,17,.10);}
+    button:disabled{
+      cursor:not-allowed;
+      opacity:.45;
+      background: rgba(17,17,17,.04);
+    }
+    .pill{
+      border: 1px solid var(--line);
+      background: rgba(17,17,17,.03);
+      color: var(--muted);
+      border-radius:999px;
+      padding:8px 12px;
+      min-width:110px;
+      text-align:center;
+    }
+
+    .card{
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:18px;
+      box-shadow:0 6px 18px rgba(0,0,0,.05);
+      overflow:hidden;
+    }
+    .hint{padding:10px 12px 0 12px;font-size:12px;color:var(--muted)}
+    .legend{display:flex;gap:10px;flex-wrap:wrap;padding:10px 12px;border-top:1px solid var(--line);color:var(--muted);font-size:12px}
+    .kbd{border:1px solid var(--line);border-radius:8px;padding:2px 8px;color:var(--text);opacity:.9}
+
+    #grid{display:block;padding:10px 12px 2px 12px;}
+    .entityCard{
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px 12px 10px 12px;
+      margin: 12px 0;
+      box-shadow: 0 6px 18px rgba(0,0,0,.04);
+    }
+    .entityCardHeader{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px;}
+    .entityTitleRow{display:flex;align-items:center;gap:8px;}
+    .entityCardTitle{font-size:15px;font-weight:700;cursor:pointer;user-select:none;}
+    .entityCardTitle:hover{text-decoration:underline;}
+    .entityCardMeta{font-size:12px;color:var(--muted);margin-top:4px;}
+    .weightLink{cursor:pointer; font-weight:700; color: rgba(17,17,17,.72); user-select:none;}
+    .weightLink:hover{text-decoration:underline;}
+
+    .miniTable{
+      width:100%;
+      border-collapse:separate;
+      border-spacing:0;
+      overflow:hidden;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background:#fff;
+      table-layout:fixed;
+    }
+    .miniTable th, .miniTable td{
+      border-right:1px solid var(--line2);
+      border-bottom:1px solid var(--line2);
+      padding:0 6px;
+      font-size:13px;
+      text-align:center;
+      white-space:nowrap;
+      min-width:22px;
+      height:28px;
+      line-height:28px;
+      vertical-align:middle;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .miniTable thead th{
+      background: rgba(17,17,17,.03);
+      color: rgba(17,17,17,.72);
+      font-weight:600;
+      position:sticky;
+      top:0;
+      z-index:2;
+      text-align:center;
+    }
+    .miniTable th:last-child, .miniTable td:last-child{border-right:none}
+    .miniTable tr:last-child td{border-bottom:none}
+
+    .miniTable .itemCol{
+      background: rgba(17,17,17,.02);
+      color: rgba(17,17,17,.65);
+      font-weight:700;
+      width:96px;
+      min-width:96px;
+      text-align:center;
+    }
+
+    td.cell{cursor:pointer;}
+    td.cell:hover{background: var(--hover);}
+    .miniTable td.todaycol, .miniTable th.todaycol{background: var(--today) !important;}
+
+    td.disabled{
+      cursor:not-allowed !important;
+      color: rgba(17,17,17,.25);
+      background: rgba(17,17,17,.02) !important;
+    }
+
+    .modal-backdrop{
+      position:fixed;inset:0;background:rgba(0,0,0,.40);
+      display:none;align-items:center;justify-content:center;padding:16px;z-index:50
+    }
+    .modal{
+      width:min(1200px,100%);
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius:16px;
+      box-shadow:0 20px 60px rgba(0,0,0,.20);
+      overflow:hidden
+    }
+    .modal-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line)}
+    .modal-title{font-weight:800}
+    .modal-body{padding:14px 16px}
+    .field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+    label{font-size:12px;color:var(--muted)}
+    input, textarea, select{
+      background:#fff;border:1px solid var(--line);color:var(--text);
+      border-radius:12px;padding:10px 12px;outline:none
+    }
+    textarea{min-height:88px;resize:vertical}
+    .actions{display:flex;gap:10px;justify-content:flex-end;margin-top:12px}
+    .dangerBtn{background: rgba(220,38,38,.10); color:#991b1b;}
+    .small{font-size:12px;color:var(--muted)}
+    .counter{font-size:12px;color:var(--muted);text-align:right;margin-top:6px}
+
+    .historyWrap{
+      overflow-y:auto;
+      overflow-x:hidden;
+      max-height:80vh;
+      border:1px solid var(--line);
+      border-radius:12px;
+    }
+    .historyTable{
+      border-collapse:separate;border-spacing:0;
+      width:100%;
+      background:#fff;
+      table-layout:fixed;
+    }
+    .historyTable th, .historyTable td{
+      border-right:1px solid var(--line2);
+      border-bottom:1px solid var(--line2);
+      padding:0 4px;
+      font-size:12px;
+      text-align:center;
+      height:26px;
+      line-height:26px;
+      vertical-align:middle;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .historyTable thead th{
+      position:sticky; top:0; z-index:3;
+      background: rgba(17,17,17,.03);
+      font-weight:600;
+      text-align:center;
+    }
+    .historyTable th:first-child, .historyTable td:first-child{
+      position:sticky; left:0; z-index:4;
+      background: rgba(17,17,17,.02);
+      font-weight:800;
+      width:96px; min-width:96px;
+    }
+    .historyTable td.iconCell{cursor:pointer;}
+    .historyTable td.iconCell:hover{background: var(--hover);}
+    .historyTable td.todaycol, .historyTable th.todaycol{background: var(--today) !important;}
+    .historyTable td.disabled{cursor:not-allowed !important; color: rgba(17,17,17,.25); background: rgba(17,17,17,.02) !important;}
+    .historyTable td.blank{cursor:default;}
+
+    .weightViewWrap{
+      width:100%;
+      aspect-ratio: 5 / 2;
+      border:1px solid var(--line);
+      border-radius:12px;
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+      background:#fff;
+    }
+    .weightViewTop{
+      padding:10px 12px;
+      border-bottom:1px solid var(--line);
+      display:flex;
+      gap:10px;
+      align-items:flex-end;
+      justify-content:space-between;
+    }
+    .weightForm{display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;}
+    .weightForm .field{margin:0}
+    .weightViewBottom{flex:1;display:flex;min-height:0;}
+    .weightTableWrap{flex:1.25;overflow:auto;border-right:1px solid var(--line);min-width:0;}
+    .weightChartWrap{flex:1;padding:10px;min-width:0;}
+    .weightTable{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;}
+    .weightTable th, .weightTable td{
+      border-bottom:1px solid var(--line2);
+      padding:0 10px;
+      height:28px; line-height:28px;
+      font-size:12px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .weightTable th{
+      position:sticky; top:0;
+      background: rgba(17,17,17,.03);
+      font-weight:700;
+    }
+    .weightTable td:last-child, .weightTable th:last-child{text-align:right}
+  
+    /* === Weight view overrides (v2) === */
+    .weightViewBottom{flex:1;display:flex;min-height:0;gap:0;}
+    .weightChartWrap{
+      flex:1.5;
+      padding:10px;
+      min-width:0;
+      border-right:1px solid var(--line);
+    }
+    .weightRightWrap{
+      flex:1;
+      display:flex;
+      flex-direction:column;
+      min-width:0;
+    }
+    .weightRightTop{
+      padding:10px 12px;
+      border-bottom:1px solid var(--line);
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    .weightRightTop .weightForm{justify-content:flex-end}
+    .weightTableWrap{
+      flex:1;
+      overflow:auto;
+      min-height:0;
+      border-right:none;
+    }
+    .weightTable th, .weightTable td{
+      text-align:center;
+    }
+    .weightChartScroll{
+      width:100%;
+      height:100%;
+      overflow-x:auto;
+      overflow-y:hidden;
+    }
+    .weightChartInner{
+      height:100%;
+      min-height:0;
+    }
+
+  
+    /* === Small modals (비고/Day 상세) === */
+    .modal.smallModal{
+      width: min(420px, 100%);
+      max-height: 540px;
+    }
+    .modal.smallModal .modal-body{
+      overflow:auto;
+      max-height: calc(540px - 58px);
+    }
+    .dayHeaderNav{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin-bottom:10px;
+    }
+    .dayHeaderNav .datePill{
+      flex:1;
+      text-align:center;
+      font-weight:800;
+      padding:8px 10px;
+      border:1px solid var(--line);
+      border-radius:12px;
+      background: rgba(17,17,17,.03);
+    }
+    .noteList{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    .noteItem{
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:10px 10px;
+      background:#fff;
+      cursor:pointer;
+      display:flex;
+      align-items:flex-start;
+    }
+    .noteItem:hover{background: var(--hover);}
+    .noteTitleRow{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      font-weight:800;
+      min-width:0;
+      width:100%;
+    }
+    .noteTitleRow .meta{
+      font-weight:700;
+      color: rgba(17,17,17,.60);
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;  
+    }
+
+    /* Day 상세뷰 */
+#dayBackdrop {
+  z-index: 100;
+}
+
+/* 비고 추가 창 (항상 위) */
+#noteBackdrop {
+  z-index: 200;
+}
+
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="title"> 📝 Care Log </div>
+      <div class="monthnav">
+        <button id="prevBtn">←</button>
+        <div class="pill" id="monthLabel"></div>
+        <button id="nextBtn">→</button>
+        <button id="todayBtn">오늘</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="hint">기록 시작: 2025-12 · 미래 날짜는 수정 불가 · 오늘~어제는 즉시 수정 · 그 이전은 확인 팝업</div>
+      <div id="grid"></div>
+      <div class="legend">
+        <span><span class="kbd">클릭</span> 루틴 셀: <b>빈칸 ↔ ✓</b> 토글</span>
+        <span><span class="kbd">클릭</span> ➕ 셀: 비고(아이콘 + 메모)</span>
+        <span><span class="kbd">이름 클릭</span> 히스토리 뷰</span>
+        <span><span class="kbd">체중</span> 메타의 ⚖️ 텍스트 클릭</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="noteBackdrop">
+    <div class="modal smallModal">
+      <div class="modal-header">
+        <div class="modal-title">➕</div>
+        <button id="noteClose">닫기</button>
+      </div>
+      <div class="modal-body">
+        <div class="field">
+          <label>아이콘</label>
+          <select id="noteIcon"></select>
+        </div>
+        <div class="field">
+          <label>상세 메모 (50자 이내)</label>
+          <textarea id="noteDetail" maxlength="50"></textarea>
+          <div class="counter"><span id="noteCount">0</span>/50</div>
+        </div>
+        <div class="actions">
+          <button class="dangerBtn" id="noteDelete">삭제</button>
+          <button id="noteSave">저장</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="weightBackdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title" id="weightTitle">체중</div>
+        <button id="weightClose">닫기</button>
+      </div>
+      <div class="modal-body">
+        <div class="weightViewWrap" id="weightViewWrap">
+          <div class="weightViewTop">
+            <div class="small" id="weightMeta"></div>
+            <div class="weightForm">
+              <div class="field">
+                <label>측정일</label>
+                <input type="date" id="weightDate" />
+              </div>
+              <div class="field">
+                <label>체중</label>
+                <input id="weightValue" placeholder="예: 4.8 또는 21" />
+              </div>
+              <button id="weightAdd">추가/업데이트</button>
+            </div>
+          </div>
+
+          <div class="weightViewBottom">
+            <div class="weightChartWrap">
+              <div class="weightChartScroll">
+                <div class="weightChartInner">
+                  <canvas id="weightChart"></canvas>
+                </div>
+              </div>
+              <div class="small" style="margin-top:6px;">(차트: 월 단위 축 · 좌우 스크롤 가능)</div>
+            </div>
+
+              <div class="weightTableWrap">
+                <table class="weightTable" id="weightTable">
+                  <thead>
+                    <tr>
+                    <th>측정일</th>
+                    <th>체중</th>
+                    </tr>
+                  </thead>
+                  <tbody id="weightTbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="historyBackdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title" id="historyTitle">히스토리</div>
+        <button id="historyClose">닫기</button>
+      </div>
+      <div class="modal-body">
+        <div class="small" id="historyHint" style="margin-bottom:10px;"></div>
+        <div class="historyWrap">
+          <table class="historyTable" id="historyTable"></table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="dayBackdrop">
+    <div class="modal smallModal">
+      <div class="modal-header">
+        <div class="modal-title" id="dayTitle">기록</div>
+        <button id="dayClose">닫기</button>
+      </div>
+      <div class="modal-body">
+        <div class="dayHeaderNav">
+          <button id="dayPrevBtn">◀</button>
+          <div class="datePill" id="dayDatePill"></div>
+          <button id="dayNextBtn">▶</button>
+        </div>
+
+        <div id="dayMeds" style="line-height:1.55; margin-bottom:10px;"></div>
+
+        <div style="font-weight:800; margin:10px 0 8px 0;"></div>
+        <div class="noteList" id="dayNoteList"></div>
+
+        <div style="border-top:1px solid var(--line); margin:12px 0;"></div>
+        <button id="dayAddBtn" style="width:100%;">+ 추가</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const APP_KEY = "carelog_v5_final";
+    const START_YM = { y: 2025, m: 12 };
+
+    const BIRTHDAYS = {
+      gangcheol: "2018-05-05",
+      saenggang: "2025-10-25",
+      huchu: "2024-08-06",
+      jjamppong: "2025-07-24"
+    };
+
+    const ENTITIES = [
+      { id:"me",        display:"👽",     type:"human",   unit:null, rows:[ { key:"me_med", kind:"routine", label:"💊" } ]},
+      { id:"gangcheol", display:"🐈 강철", type:"cat",     unit:"kg", rows:[
+        { key:"gc_am", kind:"routine", label:"아침 약" },
+        { key:"gc_pm", kind:"routine", label:"저녁 약" },
+        { key:"gc_supp", kind:"routine", label:"영양제" },
+        { key:"gc_note", kind:"note", label:"➕" }
+      ]},
+      { id:"saenggang", display:"🐈 생강", type:"cat",     unit:"kg", rows:[ { key:"sg_note", kind:"note", label:"➕" } ]},
+      { id:"huchu",     display:"🦎 후추", type:"reptile", unit:"g",  rows:[ { key:"hc_note", kind:"note", label:"➕" } ]},
+      { id:"jjamppong", display:"🦎 짬뽕", type:"reptile", unit:"g",  rows:[ { key:"jp_note", kind:"note", label:"➕" } ]}
+    ];
+
+    const CAT_NOTE_ICONS = [
+      { v:"⚡", t:"발작" }, { v:"🤮", t:"구토" }, { v:"🩺", t:"병원" }, { v:"🫧", t:"목욕" },
+      { v:"💩", t:"모래갈이" }, { v:"🪣", t:"락스청소" }, { v:"❗", t:"기타" }
+    ];
+    const REP_NOTE_ICONS = [
+      { v:"🥄", t:"피딩" }, { v:"✨", t:"탈피" }, { v:"🧻", t:"패드갈이" }, { v:"🪣", t:"물청소" }, { v:"❗", t:"기타" }
+    ];
+
+    function loadState(){
+      try{
+        const raw = localStorage.getItem(APP_KEY);
+        if(!raw) return { checks:{}, notes:{}, weights:{} };
+        const p = JSON.parse(raw);
+        const st = { checks: p.checks||{}, notes:p.notes||{}, weights:p.weights||{} };
+        // migrate legacy note object -> array
+        Object.keys(st.notes||{}).forEach(rk=>{
+          const byDate = st.notes[rk]||{};
+          Object.keys(byDate).forEach(ds=>{
+            const v = byDate[ds];
+            if(!v) return;
+            if(Array.isArray(v)) return;
+            // legacy single object
+            byDate[ds] = [{ icon: v.icon||"", detail: v.detail||"", at: v.at||ds }];
+          });
+        });
+        return st;
+      }catch(e){ return { checks:{}, notes:{}, weights:{} }; }
+    }
+    function saveState(){ localStorage.setItem(APP_KEY, JSON.stringify(state)); }
+    let state = loadState();
+
+    const pad2 = n => String(n).padStart(2,"0");
+    function ymd(d){ return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; }
+    function monthLabel(d){ return `${d.getFullYear()}년 ${d.getMonth()+1}월`; }
+    function daysInMonth(y, m1){ return new Date(y, m1, 0).getDate(); }
+    function startDate(){ return new Date(START_YM.y, START_YM.m-1, 1); }
+    function currentMonthFirst(){ const t=new Date(); t.setHours(0,0,0,0); t.setDate(1); return t; }
+    function isFutureDate(dateStr){ const d=new Date(dateStr+"T00:00:00"); const t=new Date(); t.setHours(0,0,0,0); return d>t; }
+    function isTodayOrYesterday(dateStr){
+      const d=new Date(dateStr+"T00:00:00"); const t=new Date(); t.setHours(0,0,0,0);
+      const diff=(t-d)/(1000*60*60*24); return diff===0 || diff===1;
+    }
+    function requiresConfirm(dateStr){ return !isFutureDate(dateStr) && !isTodayOrYesterday(dateStr); }
+    function nowDay(){ const t=new Date(); t.setHours(0,0,0,0); return ymd(t); }
+    function canNavigatePrev(cur){ return cur>startDate(); }
+    function canNavigateNext(cur){ return cur<currentMonthFirst(); }
+
+    function escapeHtml(s){
+  const div = document.createElement("div");
+  div.textContent = (s ?? "");
+  return div.innerHTML;
+}
+
+
+    function getCheck(rowKey, dateStr){ return state.checks?.[rowKey]?.[dateStr] || null; }
+    function setCheck(rowKey, dateStr, val){
+      if(!state.checks[rowKey]) state.checks[rowKey]={};
+      if(val===null) delete state.checks[rowKey][dateStr];
+      else state.checks[rowKey][dateStr] = { v:val, at: nowDay() };
+      saveState();
+    }
+    function getNotes(rowKey, dateStr){
+      const arr = state.notes?.[rowKey]?.[dateStr];
+      return Array.isArray(arr) ? arr : [];
+    }
+    function setNotes(rowKey, dateStr, arr){
+      if(!state.notes[rowKey]) state.notes[rowKey]={};
+      if(!arr || !arr.length) delete state.notes[rowKey][dateStr];
+      else state.notes[rowKey][dateStr] = arr;
+      saveState();
+    }
+    function addNote(rowKey, dateStr, noteObj){
+      const arr = getNotes(rowKey,dateStr).slice();
+      arr.push({ icon: noteObj.icon||"", detail: noteObj.detail||"", at: nowDay() });
+      setNotes(rowKey,dateStr,arr);
+    }
+    function updateNote(rowKey, dateStr, idx, noteObj){
+      const arr = getNotes(rowKey,dateStr).slice();
+      if(idx<0 || idx>=arr.length) return;
+      arr[idx] = { ...arr[idx], icon: noteObj.icon||"", detail: noteObj.detail||"", at: nowDay() };
+      setNotes(rowKey,dateStr,arr);
+    }
+    function deleteNoteAt(rowKey, dateStr, idx){
+      const arr = getNotes(rowKey,dateStr).slice();
+      if(idx<0 || idx>=arr.length) return;
+      arr.splice(idx,1);
+      setNotes(rowKey,dateStr,arr);
+    }
+    
+    function getWeights(entityId){ return (state.weights?.[entityId]||[]).slice().sort((a,b)=>a.date.localeCompare(b.date)); }
+    function upsertWeight(entityId, dateStr, value, unit){
+      if(!state.weights[entityId]) state.weights[entityId]=[];
+      const arr=state.weights[entityId];
+      const idx=arr.findIndex(x=>x.date===dateStr);
+      const entry={ date:dateStr, value, unit, at: nowDay() };
+      if(idx>=0) arr[idx]=entry; else arr.push(entry);
+      arr.sort((a,b)=>a.date.localeCompare(b.date));
+      saveState();
+    }
+
+    function deleteWeight(entityId, dateStr){
+      if(!state.weights[entityId]) return;
+      state.weights[entityId] = state.weights[entityId].filter(x=>x.date!==dateStr);
+      saveState();
+    }
+    function latestWeight(entityId){ const arr=getWeights(entityId); return arr.length?arr[arr.length-1]:null; }
+
+    function allowEditOrConfirm(dateStr){
+      if(isFutureDate(dateStr)){ alert("미래 기록은 수정할 수 없어요."); return false; }
+      if(requiresConfirm(dateStr)) return confirm("수정하시겠습니까?");
+      return true;
+    }
+
+    function entityFromRowKey(rowKey){
+      if(rowKey.startsWith("gc_")) return "gangcheol";
+      if(rowKey.startsWith("sg_")) return "saenggang";
+      if(rowKey.startsWith("hc_")) return "huchu";
+      if(rowKey.startsWith("jp_")) return "jjamppong";
+      if(rowKey.startsWith("me_")) return "me";
+      return null;
+    }
+
+    function ageFromBirthday(bdStr){
+      if(!bdStr) return "";
+      const bd = new Date(bdStr+"T00:00:00");
+      if(Number.isNaN(bd.getTime())) return "";
+      const today = new Date(); today.setHours(0,0,0,0);
+
+      let months = (today.getFullYear()-bd.getFullYear())*12 + (today.getMonth()-bd.getMonth());
+      if(today.getDate() < bd.getDate()) months -= 1;
+      if(months < 0) months = 0;
+
+      const years = Math.floor(months/12);
+      const rem = months%12;
+      return `[ ${years}년 ${rem}개월 ]`;
+    }
+
+    function birthdayText(entity){
+      if(entity.type==="human") return "";
+      const bd=BIRTHDAYS[entity.id]||"";
+      const icon=(entity.type==="reptile")?"🥚":"🎂";
+      if(!bd) return `${icon} (미입력)`;
+      const parts = bd.split("-");
+      const nice = `${Number(parts[0])}. ${Number(parts[1])}. ${Number(parts[2])}`;
+      return `${icon} ${nice}  ${ageFromBirthday(bd)}`;
+    }
+
+    let cursor = currentMonthFirst();
+
+    const grid=document.getElementById("grid");
+    const monthLabelEl=document.getElementById("monthLabel");
+    const prevBtn=document.getElementById("prevBtn");
+    const nextBtn=document.getElementById("nextBtn");
+    const todayBtn=document.getElementById("todayBtn");
+
+    function build(){
+      monthLabelEl.textContent = monthLabel(cursor);
+      prevBtn.disabled = !canNavigatePrev(cursor);
+      nextBtn.disabled = !canNavigateNext(cursor);
+
+      const y=cursor.getFullYear();
+      const m1=cursor.getMonth()+1;
+      const dim=daysInMonth(y,m1);
+
+      const today=new Date(); today.setHours(0,0,0,0);
+      const isThisMonth=(today.getFullYear()===y && (today.getMonth()+1)===m1);
+      const todayDay=isThisMonth?today.getDate():null;
+
+      let out="";
+      ENTITIES.forEach(entity=>{
+        const metaParts = [];
+        const bd = birthdayText(entity);
+        if(bd) metaParts.push(`<span>${escapeHtml(bd)}</span>`);
+        if(entity.type!=="human"){
+          const lw=latestWeight(entity.id);
+          const w=lw ? `⚖️ ${lw.value}${lw.unit} (${lw.date.slice(5)})` : `⚖️ (미입력)`;
+          metaParts.push(`<span class="weightLink" data-scale="${entity.id}">${escapeHtml(w)}</span>`);
+        }
+        const metaHtml = metaParts.length ? `<div class="entityCardMeta">${metaParts.join(" &nbsp;&nbsp; ")}</div>` : "";
+
+        out += `
+          <div class="entityCard">
+            <div class="entityCardHeader">
+              <div>
+                <div class="entityTitleRow">
+                  <div class="entityCardTitle entity-name" data-entity="${entity.id}">${entity.display}</div>
+                </div>
+                ${metaHtml}
+              </div>
+            </div>
+
+            <div style="overflow:auto;">
+              <table class="miniTable">
+                <thead>
+                  <tr>
+                    <th class="itemCol"></th>
+                    ${Array.from({length:dim},(_,i)=>{
+                      const d=i+1;
+                      const cls=(todayDay===d)?"todaycol":"";
+                      return `<th class="${cls}">${d}</th>`;
+                    }).join("")}
+                  </tr>
+                </thead>
+                <tbody>
+                  ${entity.rows.map(row=>`
+                    <tr>
+                      <td class="itemCol">${escapeHtml(row.label||"")}</td>
+                      ${Array.from({length:dim},(_,i)=>{
+                        const d=i+1;
+                        const dateStr=`${y}-${pad2(m1)}-${pad2(d)}`;
+                        const dis=isFutureDate(dateStr)?"disabled":"";
+                        const cls=(todayDay===d)?"cell todaycol":"cell";
+                        if(row.kind==="routine"){
+                          const chk=getCheck(row.key,dateStr);
+                          return `<td class="${cls} ${dis}" data-kind="routine" data-row="${row.key}" data-date="${dateStr}">${chk?chk.v:""}</td>`;
+                        }else{
+                          const notes=getNotes(row.key,dateStr);
+                          const icon = notes.length===0 ? "" : (notes.length===1 ? (notes[0].icon||"") : "✳️");
+                          const tip = notes.length ? notes.map(n=>`${n.icon||""} ${n.detail||""}`.trim()).join("\n") : "";
+                          return `<td class="${cls} ${dis}" data-kind="note" data-row="${row.key}" data-date="${dateStr}" title="${escapeHtml(tip)}">${escapeHtml(icon)}</td>`;
+                        }
+                      }).join("")}
+                    </tr>
+                  `).join("")}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      });
+
+      grid.innerHTML=out;
+
+      grid.querySelectorAll("td.cell").forEach(td=>td.addEventListener("click", onCellClick));
+      document.querySelectorAll(".entity-name").forEach(el=>el.addEventListener("click", ()=>openHistoryModal(el.dataset.entity)));
+      document.querySelectorAll(".weightLink").forEach(el=>el.addEventListener("click", ()=>openWeightModal(el.dataset.scale)));
+    }
+
+    function onCellClick(e){
+      const td=e.currentTarget;
+      if(td.classList.contains("disabled")) return;
+
+      const kind=td.dataset.kind;
+      const rowKey=td.dataset.row;
+      const dateStr=td.dataset.date;
+
+      if(isFutureDate(dateStr)){ alert("미래 기록은 수정할 수 없어요."); return; }
+
+      if(kind==="routine"){
+        if(!allowEditOrConfirm(dateStr)) return;
+        const cur=getCheck(rowKey,dateStr);
+        setCheck(rowKey,dateStr,(cur&&cur.v==="✓")?null:"✓");
+        build();
+      }else{ openDayDetail(entityFromRowKey(rowKey), dateStr); }
+    }
+
+    const noteBackdrop=document.getElementById("noteBackdrop");
+    const noteIcon=document.getElementById("noteIcon");
+    const noteDetail=document.getElementById("noteDetail");
+    const noteCount=document.getElementById("noteCount");
+    let noteCtx=null; // {rowKey,dateStr,entityId,idx}
+
+    document.getElementById("noteClose").onclick=()=>closeNoteModal();
+    noteBackdrop.addEventListener("click",(e)=>{ if(e.target===noteBackdrop) closeNoteModal(); });
+    noteDetail.addEventListener("input",()=>{ noteCount.textContent=String(noteDetail.value.length); });
+
+    function setIconOptions(entityId){
+      const entity=ENTITIES.find(e=>e.id===entityId);
+      const opts=(entity.type==="cat")?CAT_NOTE_ICONS:REP_NOTE_ICONS;
+      noteIcon.innerHTML = `<option value="">(없음)</option>` + opts.map(o=>`<option value="${o.v}">${o.v} ${o.t}</option>`).join("");
+    }
+    function openNoteModal(rowKey,dateStr, idx){
+      const entityId=entityFromRowKey(rowKey);
+      if(!entityId) return;
+      setIconOptions(entityId);
+      noteCtx={ rowKey, dateStr, entityId, idx };
+      const ex = (idx!==null && idx!==undefined) ? getNotes(rowKey,dateStr)[idx] : null;
+      noteIcon.value = ex?.icon || "";
+      noteDetail.value = ex?.detail || "";
+      noteCount.textContent = String(noteDetail.value.length);
+      noteBackdrop.style.display="flex";
+      noteDetail.focus();
+    }
+    function closeNoteModal(){ noteBackdrop.style.display="none"; noteCtx=null; }
+
+    document.getElementById("noteSave").onclick=()=>{
+      if(!noteCtx) return;
+      if(!allowEditOrConfirm(noteCtx.dateStr)) return;
+      const icon=noteIcon.value||"";
+      const detail=(noteDetail.value||"").slice(0,50).trim();
+      if(!icon && !detail){
+        // empty: delete if editing, else just close
+        if(noteCtx.idx!==null && noteCtx.idx!==undefined) deleteNoteAt(noteCtx.rowKey,noteCtx.dateStr,noteCtx.idx);
+      }else{
+        if(noteCtx.idx!==null && noteCtx.idx!==undefined) updateNote(noteCtx.rowKey,noteCtx.dateStr,noteCtx.idx,{icon,detail});
+        else addNote(noteCtx.rowKey,noteCtx.dateStr,{icon,detail});
+      }
+      closeNoteModal();
+      build();
+      if(dayCtx) openDayDetail(dayCtx.entityId, dayCtx.dateStr, true);
+    };
+    document.getElementById("noteDelete").onclick=()=>{
+      if(!noteCtx) return;
+      if(!allowEditOrConfirm(noteCtx.dateStr)) return;
+      if(noteCtx.idx===null || noteCtx.idx===undefined){ closeNoteModal(); return; }
+      if(!confirm("삭제하시겠습니까?")) return;
+      deleteNoteAt(noteCtx.rowKey,noteCtx.dateStr,noteCtx.idx);
+      closeNoteModal();
+      build();
+      if(dayCtx) openDayDetail(dayCtx.entityId, dayCtx.dateStr, true);
+    };
+    
+    const weightBackdrop=document.getElementById("weightBackdrop");
+    const weightTitle=document.getElementById("weightTitle");
+    const weightClose=document.getElementById("weightClose");
+    const weightDate=document.getElementById("weightDate");
+    const weightValue=document.getElementById("weightValue");
+    const weightAdd=document.getElementById("weightAdd");
+    const weightMeta=document.getElementById("weightMeta");
+    const weightTbody=document.getElementById("weightTbody");
+    let weightEntityId=null;
+    let chart=null;
+
+    weightClose.onclick=()=>{ weightBackdrop.style.display="none"; weightEntityId=null; };
+    weightBackdrop.addEventListener("click",(e)=>{ if(e.target===weightBackdrop){ weightBackdrop.style.display="none"; weightEntityId=null; }});
+
+    function openWeightModal(entityId){
+      const entity=ENTITIES.find(e=>e.id===entityId);
+      if(!entity || entity.type==="human") return;
+      weightEntityId=entityId;
+      renderWeightModal(entityId);
+      weightBackdrop.style.display="flex";
+    }
+
+    weightAdd.onclick=()=>{
+      if(!weightEntityId) return;
+      const d=weightDate.value;
+      const v=(weightValue.value||"").trim();
+      if(!d || !v) return;
+
+      if(isFutureDate(d)){ alert("미래 기록은 수정할 수 없어요."); return; }
+      if(requiresConfirm(d) && !confirm("수정하시겠습니까?")) return;
+
+      const entity=ENTITIES.find(e=>e.id===weightEntityId);
+      const unit=entity.unit;
+
+      const num=Number(v);
+      const val=Number.isFinite(num)?num:v;
+
+      upsertWeight(weightEntityId,d,val,unit);
+      renderWeightModal(weightEntityId);
+      build();
+    };
+
+    
+    function renderWeightModal(entityId){
+      const entity=ENTITIES.find(e=>e.id===entityId);
+      weightTitle.textContent = `${entity.display} — 체중`;
+      weightMeta.textContent = `단위: ${entity.unit} · (측정일은 원하는 날짜로 선택 가능)`;
+
+      const t=new Date(); t.setHours(0,0,0,0);
+      weightDate.value = ymd(t);
+      weightValue.value = "";
+
+      // Table (newest first)
+      const arrDesc=getWeights(entityId).slice().reverse();
+
+      if(arrDesc.length){
+        weightTbody.innerHTML = arrDesc.map(x=>`
+          <tr class="wrow" data-date="${escapeHtml(x.date)}">
+            <td>${escapeHtml(x.date)}</td>
+            <td>${escapeHtml(String(x.value))}${escapeHtml(x.unit||"")}</td>
+          </tr>
+        `).join("");
+      }else{
+        weightTbody.innerHTML = `<tr><td colspan="2" style="color:rgba(17,17,17,.55);padding:10px 12px;text-align:center;">기록 없음</td></tr>`;
+      }
+
+      // Delete on row click
+      document.querySelectorAll("#weightTbody tr.wrow").forEach(tr=>{
+        tr.addEventListener("click", ()=>{
+          const d = tr.getAttribute("data-date");
+          if(!d) return;
+          if(isFutureDate(d)){ alert("미래 기록은 수정/삭제할 수 없어요."); return; }
+          if(requiresConfirm(d) && !confirm("수정하시겠습니까?")) return;
+          if(!confirm("삭제하시겠습니까?")) return;
+          deleteWeight(entityId, d);
+          renderWeightModal(entityId);
+          build();
+        });
+      });
+
+      // ===== Chart: fixed range, horizontal scroll =====
+      // Range: from 2025-11 to end of next month
+      const rangeStart = new Date(2025, 10, 1); // 2025-11-01
+      const nm = new Date(); nm.setHours(0,0,0,0);
+      const endOfNextMonth = new Date(nm.getFullYear(), nm.getMonth()+2, 0); // last day of next month
+
+      // month labels
+      const monthKeys = [];
+      const monthLabels = [];
+      let cur = new Date(rangeStart);
+      cur.setHours(0,0,0,0);
+      while(cur <= endOfNextMonth){
+        const key = `${cur.getFullYear()}-${pad2(cur.getMonth()+1)}`;
+        monthKeys.push(key);
+        monthLabels.push(`${cur.getFullYear()}-${pad2(cur.getMonth()+1)}`);
+        cur = new Date(cur.getFullYear(), cur.getMonth()+1, 1);
+      }
+
+      // Map all weight entries to x positions within month (monthIndex + day/31)
+      const asc = getWeights(entityId);
+      const points = [];
+      asc.forEach(x=>{
+        const mk = x.date.slice(0,7);
+        const mi = monthKeys.indexOf(mk);
+        if(mi<0) return;
+        const day = Number(x.date.slice(8,10));
+        const frac = Math.min(0.999, Math.max(0.0, (day-1)/31));
+        const yv = (typeof x.value==="number") ? x.value : null;
+        if(yv===null) return;
+        points.push({ x: mi + frac, y: yv });
+      });
+      points.sort((a,b)=>a.x-b.x);
+
+      // Set canvas width for horizontal scrolling
+      const canvas = document.getElementById("weightChart");
+      const monthsCount = monthKeys.length;
+      const pxPerMonth = 80;
+      canvas.width = Math.max(900, monthsCount * pxPerMonth);
+      canvas.height = 260;
+
+      const ctx = canvas.getContext("2d");
+      if(chart) chart.destroy();
+
+      chart = new Chart(ctx,{
+        type:"line",
+        data:{
+          labels: monthLabels,
+          datasets:[{
+            label:`체중(${entity.unit})`,
+            data: points,
+            parsing: false,
+            spanGaps:true,
+            tension:0.45,
+            cubicInterpolationMode:"monotone",
+            pointRadius:3,
+            pointHoverRadius:5
+          }]
+        },
+        options:{
+          responsive:false,
+          maintainAspectRatio:false,
+          plugins:{ legend:{ display:true } },
+          scales:{
+            x:{ type:"linear", min:0, max:(monthKeys.length-1)+0.999, ticks:{ autoSkip:false, maxRotation:0, callback:(v)=>{ const i=Math.round(v); if(Math.abs(v-i)<0.001 && monthLabels[i]) return monthLabels[i]; return ""; } } },
+            y:{
+              min:0,
+              max:7
+            }
+          }
+        }
+      });
+    }
+
+
+    const historyBackdrop=document.getElementById("historyBackdrop");
+    const historyTitle=document.getElementById("historyTitle");
+    const historyHint=document.getElementById("historyHint");
+    const historyTable=document.getElementById("historyTable");
+
+    document.getElementById("historyClose").onclick=()=>{ historyBackdrop.style.display="none"; };
+    historyBackdrop.addEventListener("click",(e)=>{ if(e.target===historyBackdrop) historyBackdrop.style.display="none"; });
+
+    function monthListFromStartToNowDesc(){
+      const max=currentMonthFirst();
+      const min=startDate();
+      const list=[];
+      let cur=new Date(max);
+      while(cur>=min){
+        list.push({ y:cur.getFullYear(), m1:cur.getMonth()+1 });
+        cur=new Date(cur.getFullYear(), cur.getMonth()-1, 1);
+      }
+      return list;
+    }
+    function isPastNoteOnlyMonth(y,m1){ return (y===2025 && m1===12) || (y===2026 && m1===1); }
+
+    function historyIconForDate(entityId,y,m1,day){
+      const dim=daysInMonth(y,m1);
+      if(day>dim) return { icon:"", disabled:true, dateStr:null, tip:"" };
+      const dateStr=`${y}-${pad2(m1)}-${pad2(day)}`;
+      if(isFutureDate(dateStr)) return { icon:"", disabled:true, dateStr:null, tip:"" };
+
+      const noteKey = entityId==="gangcheol"?"gc_note"
+                    : entityId==="saenggang"?"sg_note"
+                    : entityId==="huchu"?"hc_note"
+                    : entityId==="jjamppong"?"jp_note"
+                    : null;
+      const notes = noteKey ? getNotes(noteKey,dateStr) : [];
+      const noteIcon = notes.length===0 ? "" : (notes.length===1 ? (notes[0].icon||"") : "✳️");
+      const noteTip = notes.length ? notes.map(n=>`${n.icon||""} ${n.detail||""}`.trim()).join("\n") : "";
+
+      if(isPastNoteOnlyMonth(y,m1)){
+        return { icon: noteIcon, disabled:false, dateStr: (noteIcon?dateStr:null), tip: noteTip };
+      }
+
+      if(entityId==="me"){
+        const chk=getCheck("me_med",dateStr);
+        if(!chk) return { icon:"❌", disabled:false, dateStr, tip:"약 미복용" };
+        return { icon:"", disabled:false, dateStr:null, tip:"" };
+      }
+
+      if(entityId==="gangcheol"){
+        const am=!!getCheck("gc_am",dateStr);
+        const missed=!(am && pm);
+        if(missed && noteIcon) return { icon:"✳️", disabled:false, dateStr, tip:["약 미복용", noteTip].filter(Boolean).join("\n") };
+        if(missed) return { icon:"❌", disabled:false, dateStr, tip:"약 미복용" };
+        if(noteIcon) return { icon:noteIcon, disabled:false, dateStr, tip: noteTip };
+        return { icon:"", disabled:false, dateStr:null, tip:"" };
+      }
+
+      if(noteIcon) return { icon:noteIcon, disabled:false, dateStr, tip: noteTip };
+      return { icon:"", disabled:false, dateStr:null, tip:"" };
+    }
+
+    function openHistoryModal(entityId){
+      const entity=ENTITIES.find(e=>e.id===entityId);
+      historyTitle.textContent = `${entity.display} — 히스토리`;
+      historyHint.textContent = "맨 위가 최신 달, 아래로 갈수록 과거 달이에요. (미래/없는 날짜는 비활성)";
+
+      const months=monthListFromStartToNowDesc();
+      const curMonth=currentMonthFirst();
+      const curY=curMonth.getFullYear(), curM1=curMonth.getMonth()+1;
+      const today=new Date(); today.setHours(0,0,0,0);
+      const todayD=today.getDate();
+
+      let html="<thead><tr><th></th>";
+      for(let d=1; d<=31; d++) html += `<th>${d}</th>`;
+      html += "</tr></thead><tbody>";
+
+      months.forEach(({y,m1})=>{
+        html += `<tr><td>${y}-${pad2(m1)}</td>`;
+        for(let d=1; d<=31; d++){
+          const info=historyIconForDate(entityId,y,m1,d);
+          const isTodayCol=(y===curY && m1===curM1 && d===todayD);
+          const cls=[info.disabled?"disabled":"", info.icon?"iconCell":"blank", isTodayCol?"todaycol":""].join(" ").trim();
+          const payload = info.dateStr ? `data-date="${info.dateStr}" data-entity="${entityId}" title="${escapeHtml(info.tip||"")}"` : "";
+          html += `<td class="${cls}" ${payload}>${escapeHtml(info.icon)}</td>`;
+        }
+        html += "</tr>";
+      });
+
+      html += "</tbody>";
+      historyTable.innerHTML = html;
+
+      historyTable.querySelectorAll("td.iconCell").forEach(td=>{
+        td.addEventListener("click", ()=>{
+          const dateStr=td.getAttribute("data-date");
+          const eid=td.getAttribute("data-entity");
+          if(dateStr && eid) openDayDetail(eid,dateStr);
+        });
+      });
+
+      historyBackdrop.style.display="flex";
+    }
+
+    
+
+    
+    // ===== Day 상세 뷰 (비고/히스토리 공통) =====
+    let dayCtx=null;
+    const dayBackdrop=document.getElementById("dayBackdrop");
+    const dayTitle=document.getElementById("dayTitle");
+    const dayDatePill=document.getElementById("dayDatePill");
+    const dayPrevBtn=document.getElementById("dayPrevBtn");
+    const dayNextBtn=document.getElementById("dayNextBtn");
+    const dayMeds=document.getElementById("dayMeds");
+    const dayNoteList=document.getElementById("dayNoteList");
+    const dayAddBtn=document.getElementById("dayAddBtn");
+
+    document.getElementById("dayClose").onclick=()=>dayBackdrop.style.display="none";
+    dayBackdrop.addEventListener("click",(e)=>{ if(e.target===dayBackdrop) dayBackdrop.style.display="none"; });
+
+    function noteTitleFor(entityType, icon){
+      const list = (entityType==="cat")?CAT_NOTE_ICONS:REP_NOTE_ICONS;
+      const found = list.find(x=>x.v===icon);
+      return found ? found.t : "";
+    }
+    function rowKeyForEntity(entityId){
+      return entityId==="gangcheol"?"gc_note"
+           : entityId==="saenggang"?"sg_note"
+           : entityId==="huchu"?"hc_note"
+           : entityId==="jjamppong"?"jp_note"
+           : null;
+    }
+
+    function openDayDetail(entityId,dateStr, rerenderOnly){
+      const entity=ENTITIES.find(e=>e.id===entityId);
+      if(!entity) return;
+
+      const min = startDate();
+      const max = new Date(); max.setHours(0,0,0,0);
+      const cur = new Date(dateStr+"T00:00:00");
+      if(cur < min) return;
+      if(cur > max) return;
+
+      dayCtx = { entityId, dateStr };
+      dayTitle.textContent = `${entity.display} — 기록`;
+      dayDatePill.textContent = dateStr;
+
+      const prev = new Date(cur); prev.setDate(prev.getDate()-1);
+      const next = new Date(cur); next.setDate(next.getDate()+1);
+      dayPrevBtn.disabled = prev < min;
+      dayNextBtn.disabled = next > max;
+
+      // meds
+      let medsHtml = "<div style='font-weight:800; margin-bottom:6px;'>약 복용 상태</div>";
+      if(entityId==="me"){
+        const chk=getCheck("me_med",dateStr);
+        medsHtml += `<div>💊 ${chk ? "✓" : "미복용"}</div>`;
+      }else if(entityId==="gangcheol"){
+        medsHtml += `<div>아침 약: ${getCheck("gc_am",dateStr)?"✓":"—"}</div>`;
+        medsHtml += `<div>저녁 약: ${getCheck("gc_pm",dateStr)?"✓":"—"}</div>`;
+        medsHtml += `<div>영양제: ${getCheck("gc_supp",dateStr)?"✓":"—"}</div>`;
+      }else{
+        medsHtml += `<div class="small">(해당 없음)</div>`;
+      }
+      dayMeds.innerHTML = medsHtml;
+
+      const rowKey = rowKeyForEntity(entityId);
+      const notes = rowKey ? getNotes(rowKey,dateStr) : [];
+
+      if(!notes.length){
+        dayNoteList.innerHTML = `<div class="small" style="padding:6px 2px;">(비고 없음)</div>`;
+      }else{
+        dayNoteList.innerHTML = notes.map((n, idx)=>{
+          const title = noteTitleFor(entity.type, n.icon||"");
+          const icon = n.icon||"";
+          const memo = n.detail||"";
+          return `<div class="noteItem" data-idx="${idx}">
+                    <div class="noteTitleRow">
+                      <span>${escapeHtml(icon)}</span>
+                      <span>${escapeHtml(title||"")}</span>
+                      <span style="color:var(--muted);font-weight:700;">|</span>
+                      <span class="meta">${escapeHtml(memo||"")}</span>
+                    </div>
+                  </div>`;
+        }).join("");
+      }
+
+      dayNoteList.querySelectorAll(".noteItem").forEach(el=>{
+        el.addEventListener("click", ()=>{
+          if(!rowKey) return;
+          const idx = Number(el.getAttribute("data-idx"));
+          if(!allowEditOrConfirm(dateStr)) return;
+          if(confirm("수정하시겠습니까?")){
+            openNoteModal(rowKey,dateStr,idx);
+          }else{
+            if(confirm("삭제하시겠습니까?")){
+              deleteNoteAt(rowKey,dateStr,idx);
+              build();
+              openDayDetail(entityId,dateStr,true);
+            }
+          }
+        });
+      });
+
+      dayAddBtn.onclick=()=>{
+        if(!rowKey) return alert("이 개체는 비고를 추가할 수 없어요.");
+        if(!allowEditOrConfirm(dateStr)) return;
+        openNoteModal(rowKey,dateStr,null);
+      };
+
+      if(!rerenderOnly) dayBackdrop.style.display="flex";
+    }
+
+    dayPrevBtn.onclick=()=>{
+      if(!dayCtx) return;
+      const cur = new Date(dayCtx.dateStr+"T00:00:00"); cur.setDate(cur.getDate()-1);
+      openDayDetail(dayCtx.entityId, ymd(cur), true);
+    };
+    dayNextBtn.onclick=()=>{
+      if(!dayCtx) return;
+      const cur = new Date(dayCtx.dateStr+"T00:00:00"); cur.setDate(cur.getDate()+1);
+      openDayDetail(dayCtx.entityId, ymd(cur), true);
+    };
+prevBtn.onclick=()=>{ if(!canNavigatePrev(cursor)) return; cursor=new Date(cursor.getFullYear(), cursor.getMonth()-1, 1); build(); };
+    nextBtn.onclick=()=>{ if(!canNavigateNext(cursor)) return; cursor=new Date(cursor.getFullYear(), cursor.getMonth()+1, 1); build(); };
+    todayBtn.onclick=()=>{ cursor=currentMonthFirst(); build(); };
+
+    (function clamp(){
+      const min=startDate(), max=currentMonthFirst();
+      if(cursor<min) cursor=new Date(min);
+      if(cursor>max) cursor=new Date(max);
+    })();
+
+    build();
+  </script>
+</body>
+</html>
+"""
+
+def main() -> None:
+    here = os.path.abspath(os.path.dirname(__file__))
+    out_path = os.path.join(here, "carelog.html")
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write(HTML)
+    webbrowser.open("file://" + out_path)
+
+if __name__ == "__main__":
+    main()
