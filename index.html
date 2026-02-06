@@ -7,7 +7,6 @@
   <script src="https://www.gstatic.com/firebasejs/9.10.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.10.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.10.0/firebase-firestore-compat.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
     :root{
       --bg:#f7f7f5;
@@ -515,8 +514,12 @@
 
   firebase.initializeApp(firebaseConfig);
 
-  const db = firebase.firestore();
+  console.log("firebase global:", typeof firebase);
+console.log("apps:", firebase.apps?.length, firebase.apps);
+  
   const auth = firebase.auth();
+  const db = firebase.firestore();
+ 
 
   let myUid = null;
   let isAdmin = false;
@@ -525,16 +528,6 @@
   const appRoot = document.getElementById("appRoot");
 const gate = document.getElementById("gate");
 
-if(!isAdmin && !isAllowed){
-  appRoot.style.display = "none";
-  gate.style.display = "block";
-  gate.innerHTML = `
-    <b>접근 권한 없음</b><br><br>
-    이 UID를 관리자에게 보내서 허용 목록에 추가해달라고 하세요:<br>
-    <b style="font-size:20px">${myUid}</b>
-  `;
-  return;
-}
 
 // ✅ 허용됨: 이제부터 화면 열기 + 최초 1회 build
 gate.style.display = "none";
@@ -573,6 +566,13 @@ if(!window.__CARELOG_BUILT__){
     // (남자친구가 먼저 접속하면 관리자 권한을 가져버림)
     // meta 문서는 콘솔에서만 미리 만들어두는 방식으로 운영.
     metaRef.onSnapshot(async (snap)=>{
+
+      if(!isAdmin && !isAllowed){
+  appRoot.style.display = "none";
+  gate.style.display = "block";
+  gate.innerHTML = `... ${myUid} ...`;
+  return;
+}
       if(!snap.exists){
         updateUidBadge();
         return;
@@ -1370,6 +1370,7 @@ prevBtn.onclick=()=>{ if(!canNavigatePrev(cursor)) return; cursor=new Date(curso
   </script>
 </body>
 </html>
+
 
 
 
