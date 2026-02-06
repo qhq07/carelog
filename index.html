@@ -607,6 +607,15 @@ auth.onAuthStateChanged(async (user)=>{
       { v:"🥄", t:"피딩" }, { v:"✨", t:"탈피" }, { v:"🧻", t:"패드갈이" }, { v:"🪣", t:"물청소" }, { v:"❗", t:"기타" }
     ];
 
+function requireAdmin(){
+  if(!isAdmin){
+    alert("읽기 전용입니다. (관리자만 수정 가능)");
+    return false;
+  }
+  return true;
+}
+
+    
     function loadState(){
       try{
         const raw = localStorage.getItem(APP_KEY);
@@ -627,7 +636,9 @@ auth.onAuthStateChanged(async (user)=>{
         return st;
       }catch(e){ return { checks:{}, notes:{}, weights:{} }; }
     }
-    function saveState(){ localStorage.setItem(APP_KEY, JSON.stringify(state));
+    function saveState(){ 
+        if(!requireAdmin()) return;
+      localStorage.setItem(APP_KEY, JSON.stringify(state));
     if(isAdmin){
   stateRef.set({
     blob: state
@@ -661,6 +672,7 @@ auth.onAuthStateChanged(async (user)=>{
 
     function getCheck(rowKey, dateStr){ return state.checks?.[rowKey]?.[dateStr] || null; }
     function setCheck(rowKey, dateStr, val){
+      if(!requireAdmin()) return;
       if(!state.checks[rowKey]) state.checks[rowKey]={};
       if(val===null) delete state.checks[rowKey][dateStr];
       else state.checks[rowKey][dateStr] = { v:val, at: nowDay() };
@@ -671,23 +683,27 @@ auth.onAuthStateChanged(async (user)=>{
       return Array.isArray(arr) ? arr : [];
     }
     function setNotes(rowKey, dateStr, arr){
+      if(!requireAdmin()) return;
       if(!state.notes[rowKey]) state.notes[rowKey]={};
       if(!arr || !arr.length) delete state.notes[rowKey][dateStr];
       else state.notes[rowKey][dateStr] = arr;
       saveState();
     }
     function addNote(rowKey, dateStr, noteObj){
+      if(!requireAdmin()) return;
       const arr = getNotes(rowKey,dateStr).slice();
       arr.push({ icon: noteObj.icon||"", detail: noteObj.detail||"", at: nowDay() });
       setNotes(rowKey,dateStr,arr);
     }
     function updateNote(rowKey, dateStr, idx, noteObj){
+      if(!requireAdmin()) return;
       const arr = getNotes(rowKey,dateStr).slice();
       if(idx<0 || idx>=arr.length) return;
       arr[idx] = { ...arr[idx], icon: noteObj.icon||"", detail: noteObj.detail||"", at: nowDay() };
       setNotes(rowKey,dateStr,arr);
     }
     function deleteNoteAt(rowKey, dateStr, idx){
+      if(!requireAdmin()) return;
       const arr = getNotes(rowKey,dateStr).slice();
       if(idx<0 || idx>=arr.length) return;
       arr.splice(idx,1);
@@ -696,6 +712,7 @@ auth.onAuthStateChanged(async (user)=>{
     
     function getWeights(entityId){ return (state.weights?.[entityId]||[]).slice().sort((a,b)=>a.date.localeCompare(b.date)); }
     function upsertWeight(entityId, dateStr, value, unit){
+      if(!requireAdmin()) return;
       if(!state.weights[entityId]) state.weights[entityId]=[];
       const arr=state.weights[entityId];
       const idx=arr.findIndex(x=>x.date===dateStr);
@@ -706,6 +723,7 @@ auth.onAuthStateChanged(async (user)=>{
     }
 
     function deleteWeight(entityId, dateStr){
+      if(!requireAdmin()) return;
       if(!state.weights[entityId]) return;
       state.weights[entityId] = state.weights[entityId].filter(x=>x.date!==dateStr);
       saveState();
@@ -1305,4 +1323,5 @@ prevBtn.onclick=()=>{ if(!canNavigatePrev(cursor)) return; cursor=new Date(curso
   </script>
 </body>
 </html>
+
 
