@@ -1260,7 +1260,6 @@ function toast(msg, ms=1200){
       canvas.width = Math.max(900, monthsCount * pxPerMonth);
       canvas.height = 260;
 
-      const entity = ENTITIES.find(e => e.id === entityId);
 
 let yMax = 10; // 기본값
 if (entity.type === "cat") yMax = 7;
@@ -1553,6 +1552,7 @@ prevBtn.onclick=()=>{ if(!canNavigatePrev(cursor)) return; cursor=new Date(curso
   <div id="toast"></div>
 </body>
 </html>
+
 
 
 
