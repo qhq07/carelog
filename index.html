@@ -545,9 +545,6 @@ window.addEventListener("unhandledrejection", (e) => {
   if (b) b.textContent = "Promise Error: " + msg;
 });
   
-// ✅ 허용됨: 이제부터 화면 열기 + 최초 1회 build
-gate.style.display = "none";
-appRoot.style.display = "block";
 
 if(!window.__CARELOG_BUILT__){
   window.__CARELOG_BUILT__ = true;
@@ -582,12 +579,6 @@ if(!window.__CARELOG_BUILT__){
     // meta 문서는 콘솔에서만 미리 만들어두는 방식으로 운영.
     metaRef.onSnapshot(async (snap)=>{
 
-      if(!isAdmin && !isAllowed){
-  appRoot.style.display = "none";
-  gate.style.display = "block";
-  gate.innerHTML = `... ${myUid} ...`;
-  return;
-}
       if(!snap.exists){
         updateUidBadge();
         return;
@@ -597,6 +588,19 @@ if(!window.__CARELOG_BUILT__){
       isAdmin   = (data.adminUid === myUid);
       isAllowed = Array.isArray(data.allowedUids) && data.allowedUids.includes(myUid);
       updateUidBadge();
+
+      // 계산 끝났으니 이제 UI 결정
+if(!isAdmin && !isAllowed){
+  appRoot.style.display = "none";
+  gate.style.display = "block";
+  gate.innerHTML = `... ${myUid} ...`;
+  return;
+}
+
+// 허용됨
+gate.style.display = "none";
+appRoot.style.display = "block";
+
 
       // 허용 안된 사용자: 차단 + UID 안내
       if(!isAdmin && !isAllowed){
@@ -1385,6 +1389,7 @@ prevBtn.onclick=()=>{ if(!canNavigatePrev(cursor)) return; cursor=new Date(curso
   </script>
 </body>
 </html>
+
 
 
 
