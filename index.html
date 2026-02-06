@@ -201,11 +201,11 @@
       font-weight:800;
       width:96px; min-width:96px;
     }
-    .historyTable td.cell{cursor:pointer;}
-    .historyTable td.cell:hover{background: var(--hover);}
+    .historyTable td.iconCell{cursor:pointer;}
+    .historyTable td.iconCell:hover{background: var(--hover);}
     .historyTable td.todaycol, .historyTable th.todaycol{background: var(--today) !important;}
     .historyTable td.disabled{cursor:not-allowed !important; color: rgba(17,17,17,.25); background: rgba(17,17,17,.02) !important;}
-    .historyTable td.blank{cursor:default;}
+    .historyTable td.blank{cursor:pointer;}
 
     .weightViewWrap{
       width:100%;
@@ -1487,6 +1487,7 @@ prevBtn.onclick=()=>{ if(!canNavigatePrev(cursor)) return; cursor=new Date(curso
   </script>
 </body>
 </html>
+
 
 
 
