@@ -1340,6 +1340,9 @@ if (entity.type === "reptile") yMax = 60;
                     : entityId==="saenggang"?"sg_note"
                     : entityId==="huchu"?"hc_note"
                     : entityId==="jjamppong"?"jp_note"
+                    : entityId==="mandu"?"md_note"
+                    : entityId==="james"?"jm_note"
+                    : entityId==="hyunsu"?"hs_note"
                     : null;
       const notes = noteKey ? getNotes(noteKey,dateStr) : [];
       const noteIcon = notes.length===0 ? "" : (notes.length===1 ? (notes[0].icon||"") : "🔢");
@@ -1562,6 +1565,7 @@ prevBtn.onclick=()=>{ if(!canNavigatePrev(cursor)) return; cursor=new Date(curso
   <div id="toast"></div>
 </body>
 </html>
+
 
 
 
