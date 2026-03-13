@@ -754,7 +754,10 @@ build();
       gangcheol: "2018-05-05",
       saenggang: "2025-10-25",
       huchu: "2024-08-06",
-      jjamppong: "2025-07-24"
+      jjamppong: "2025-07-24",
+      mandu: "2025-12-24",
+      james: "2024-03-02",
+      hyunsu: "2025-06-03"
     };
 
     const ENTITIES = [
@@ -763,11 +766,17 @@ build();
         { key:"gc_am", kind:"routine", label:"아침 약" },
         { key:"gc_pm", kind:"routine", label:"저녁 약" },
         { key:"gc_supp", kind:"routine", label:"영양제" },
+        { key:"gc_to", kind:"routine", label:"양치" },
         { key:"gc_note", kind:"note", label:"➕" }
       ]},
-      { id:"saenggang", display:"🐈 생강", type:"cat",     unit:"kg", rows:[ { key:"sg_note", kind:"note", label:"➕" } ]},
+      { id:"saenggang", display:"🐈 생강", type:"cat",     unit:"kg", rows:[ 
+        { key:"sg_to", kind:"routine", label:"양치" },
+        { key:"sg_note", kind:"note", label:"➕" } ]},
       { id:"huchu",     display:"🦎 후추", type:"reptile", unit:"g",  rows:[ { key:"hc_note", kind:"note", label:"➕" } ]},
-      { id:"jjamppong", display:"🦎 짬뽕", type:"reptile", unit:"g",  rows:[ { key:"jp_note", kind:"note", label:"➕" } ]}
+      { id:"jjamppong", display:"🦎 짬뽕", type:"reptile", unit:"g",  rows:[ { key:"jp_note", kind:"note", label:"➕" } ]},
+      { id:"mandu", display:"🦎 만두", type:"reptile", unit:"g",  rows:[ { key:"md_note", kind:"note", label:"➕" } ]}
+      { id:"james", display:"🦎 Alfredo James", type:"reptile", unit:"g",  rows:[ { key:"jm_note", kind:"note", label:"➕" } ]},
+      { id:"hyunsu", display:"🦎 현수", type:"reptile", unit:"g",  rows:[ { key:"hs_note", kind:"note", label:"➕" } ]}
     ];
 
     const CAT_NOTE_ICONS = [
@@ -775,7 +784,7 @@ build();
       { v:"💩", t:"모래갈이" }, { v:"🪣", t:"락스청소" }, { v:"❗", t:"기타" }
     ];
     const REP_NOTE_ICONS = [
-      { v:"🥄", t:"피딩" }, { v:"✨", t:"탈피" }, { v:"🧻", t:"패드갈이" }, { v:"🪣", t:"물청소" }, { v:"❗", t:"기타" }
+      { v:"🥄", t:"피딩" }, { v:"🦗", t:"충식" }, { v:"✨", t:"탈피" }, { v:"🧻", t:"패드갈이" }, { v:"🪣", t:"물청소" }, { v:"❗", t:"기타" }
     ];
 
 function requireAdmin(){
@@ -1037,7 +1046,7 @@ function toast(msg, ms=1200){
                           return `<td class="${cls} ${dis}" data-kind="routine" data-row="${row.key}" data-date="${dateStr}">${chk?chk.v:""}</td>`;
                         }else{
                           const notes=getNotes(row.key,dateStr);
-                          const icon = notes.length===0 ? "" : (notes.length===1 ? (notes[0].icon||"") : "✳️");
+                          const icon = notes.length===0 ? "" : (notes.length===1 ? (notes[0].icon||"") : "🔢");
                           const tip = notes.length ? notes.map(n=>`${n.icon||""} ${n.detail||""}`.trim()).join("\n") : "";
                           return `<td class="${cls} ${dis}" data-kind="note" data-row="${row.key}" data-date="${dateStr}" title="${escapeHtml(tip)}">${escapeHtml(icon)}</td>`;
                         }
@@ -1332,7 +1341,7 @@ if (entity.type === "reptile") yMax = 60;
                     : entityId==="jjamppong"?"jp_note"
                     : null;
       const notes = noteKey ? getNotes(noteKey,dateStr) : [];
-      const noteIcon = notes.length===0 ? "" : (notes.length===1 ? (notes[0].icon||"") : "✳️");
+      const noteIcon = notes.length===0 ? "" : (notes.length===1 ? (notes[0].icon||"") : "🔢");
       const noteTip = notes.length ? notes.map(n=>`${n.icon||""} ${n.detail||""}`.trim()).join("\n") : "";
 
       if(isPastNoteOnlyMonth(y,m1)){
@@ -1349,7 +1358,7 @@ if (entity.type === "reptile") yMax = 60;
         const am=!!getCheck("gc_am",dateStr);
         const pm=!!getCheck("gc_pm",dateStr);
         const missed=!(am && pm);
-        if(missed && noteIcon) return { icon:"✳️", disabled:false, dateStr, tip:["미복용", noteTip].filter(Boolean).join("\n") };
+        if(missed && noteIcon) return { icon:"🔢", disabled:false, dateStr, tip:["미복용", noteTip].filter(Boolean).join("\n") };
         if(missed) return { icon:"❌", disabled:false, dateStr, tip:"미복용" };
         if(noteIcon) return { icon:noteIcon, disabled:false, dateStr, tip: noteTip };
         return { icon:"", disabled:false, dateStr, tip:"" };
@@ -1552,6 +1561,7 @@ prevBtn.onclick=()=>{ if(!canNavigatePrev(cursor)) return; cursor=new Date(curso
   <div id="toast"></div>
 </body>
 </html>
+
 
 
 
